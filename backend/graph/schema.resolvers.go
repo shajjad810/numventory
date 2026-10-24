@@ -8,7 +8,9 @@ package graph
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
+	"time"
 
 	"github.com/shajjadhossen/numventory/backend/graph/model"
 )
@@ -94,6 +96,89 @@ func (r *mutationResolver) CreateLocation(ctx context.Context, input model.Creat
 		ID:          strconv.FormatInt(id, 10),
 		Name:        input.Name,
 		Description: input.Description,
+	}, nil
+}
+
+// ReceiveInventory is the resolver for the receiveInventory field.
+func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.ReceiveInventoryInput) (*model.InventoryTransaction, error) {
+	// Validate the quantity before touching the database.
+	if math.IsNaN(input.Quantity) ||
+		math.IsInf(input.Quantity, 0) ||
+		input.Quantity <= 0 ||
+		input.Quantity > 9999999999.99 ||
+		math.Abs(input.Quantity*100-math.Round(input.Quantity*100)) > 1e-7 {
+		return nil, fmt.Errorf("quantity must be positive and have at most two decimal places")
+	}
+
+	productID, err := strconv.ParseInt(input.ProductID, 10, 64)
+	if err != nil || productID <= 0 {
+		return nil, fmt.Errorf("invalid product ID")
+	}
+
+	locationID, err := strconv.ParseInt(input.LocationID, 10, 64)
+	if err != nil || locationID <= 0 {
+		return nil, fmt.Errorf("invalid location ID")
+	}
+
+	// Convert to a two-decimal-place string for PostgreSQL NUMERIC.
+	quantity := strconv.FormatFloat(input.Quantity, 'f', 2, 64)
+
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin receiving transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Increase existing inventory or create a new inventory row.
+	_, err = tx.Exec(ctx, `
+        INSERT INTO inventory (product_id, location_id, quantity)
+        VALUES ($1, $2, $3::numeric)
+        ON CONFLICT (product_id, location_id)
+        DO UPDATE SET
+            quantity = inventory.quantity + EXCLUDED.quantity,
+            updated_at = NOW()
+    `, productID, locationID, quantity)
+
+	if err != nil {
+		return nil, fmt.Errorf("update inventory: %w", err)
+	}
+
+	// Record the receiving operation in transaction history.
+	var transactionID int64
+	var createdAt time.Time
+
+	err = tx.QueryRow(ctx, `
+        INSERT INTO inventory_transactions (
+            product_id,
+            location_id,
+            transaction_type,
+            quantity,
+            reference,
+            notes
+        )
+        VALUES ($1, $2, 'RECEIVING', $3::numeric, $4, $5)
+        RETURNING id, created_at
+    `, productID, locationID, quantity, input.Reference, input.Notes).
+		Scan(&transactionID, &createdAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("record receiving transaction: %w", err)
+	}
+
+	// Save both database operations together.
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit receiving transaction: %w", err)
+	}
+
+	return &model.InventoryTransaction{
+		ID:              strconv.FormatInt(transactionID, 10),
+		ProductID:       input.ProductID,
+		LocationID:      input.LocationID,
+		TransactionType: "RECEIVING",
+		Quantity:        input.Quantity,
+		Reference:       input.Reference,
+		Notes:           input.Notes,
+		CreatedAt:       createdAt.Format(time.RFC3339),
 	}, nil
 }
 
@@ -224,6 +309,115 @@ func (r *queryResolver) Locations(ctx context.Context) ([]*model.Location, error
 	return locations, nil
 }
 
+// Inventory is the resolver for the inventory field.
+func (r *queryResolver) Inventory(ctx context.Context) ([]*model.Inventory, error) {
+	rows, err := r.DB.Query(ctx, `
+        SELECT id, product_id, location_id, quantity
+        FROM inventory
+        ORDER BY id
+    `)
+	if err != nil {
+		return nil, fmt.Errorf("fetch inventory: %w", err)
+	}
+	defer rows.Close()
+
+	inventory := make([]*model.Inventory, 0)
+
+	for rows.Next() {
+		var id, productID, locationID int64
+		var quantity float64
+
+		if err := rows.Scan(
+			&id,
+			&productID,
+			&locationID,
+			&quantity,
+		); err != nil {
+			return nil, fmt.Errorf("scan inventory: %w", err)
+		}
+
+		inventory = append(inventory, &model.Inventory{
+			ID:         strconv.FormatInt(id, 10),
+			ProductID:  strconv.FormatInt(productID, 10),
+			LocationID: strconv.FormatInt(locationID, 10),
+			Quantity:   quantity,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate inventory: %w", err)
+	}
+
+	return inventory, nil
+}
+
+// InventoryTransactions is the resolver for the inventoryTransactions field.
+func (r *queryResolver) InventoryTransactions(ctx context.Context) ([]*model.InventoryTransaction, error) {
+	rows, err := r.DB.Query(ctx, `
+        SELECT
+            id,
+            product_id,
+            location_id,
+            transaction_type,
+            quantity::text,
+            reference,
+            notes,
+            created_at
+        FROM inventory_transactions
+        ORDER BY created_at DESC, id DESC
+    `)
+	if err != nil {
+		return nil, fmt.Errorf("fetch inventory transactions: %w", err)
+	}
+	defer rows.Close()
+
+	transactions := make([]*model.InventoryTransaction, 0)
+
+	for rows.Next() {
+		var id, productID, locationID int64
+		var transactionType string
+		var quantityText string
+		var reference, notes *string
+		var createdAt time.Time
+
+		err := rows.Scan(
+			&id,
+			&productID,
+			&locationID,
+			&transactionType,
+			&quantityText,
+			&reference,
+			&notes,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan inventory transaction: %w", err)
+		}
+
+		quantity, err := strconv.ParseFloat(quantityText, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse transaction quantity: %w", err)
+		}
+
+		transactions = append(transactions, &model.InventoryTransaction{
+			ID:              strconv.FormatInt(id, 10),
+			ProductID:       strconv.FormatInt(productID, 10),
+			LocationID:      strconv.FormatInt(locationID, 10),
+			TransactionType: transactionType,
+			Quantity:        quantity,
+			Reference:       reference,
+			Notes:           notes,
+			CreatedAt:       createdAt.Format(time.RFC3339),
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate inventory transactions: %w", err)
+	}
+
+	return transactions, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
@@ -234,18 +428,3 @@ type (
 	mutationResolver struct{ *Resolver }
 	queryResolver    struct{ *Resolver }
 )
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: CreateTodo - createTodo"))
-}
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: Todos - todos"))
-}
-*/

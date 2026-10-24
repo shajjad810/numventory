@@ -24,6 +24,24 @@ type CreateProductInput struct {
 	Unit        string  `json:"unit"`
 }
 
+type Inventory struct {
+	ID         string  `json:"id"`
+	ProductID  string  `json:"productId"`
+	LocationID string  `json:"locationId"`
+	Quantity   float64 `json:"quantity"`
+}
+
+type InventoryTransaction struct {
+	ID              string  `json:"id"`
+	ProductID       string  `json:"productId"`
+	LocationID      string  `json:"locationId"`
+	TransactionType string  `json:"transactionType"`
+	Quantity        float64 `json:"quantity"`
+	Reference       *string `json:"reference,omitempty"`
+	Notes           *string `json:"notes,omitempty"`
+	CreatedAt       string  `json:"createdAt"`
+}
+
 type Location struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
@@ -43,4 +61,12 @@ type Product struct {
 }
 
 type Query struct {
+}
+
+type ReceiveInventoryInput struct {
+	ProductID  string  `json:"productId"`
+	LocationID string  `json:"locationId"`
+	Quantity   float64 `json:"quantity"`
+	Reference  *string `json:"reference,omitempty"`
+	Notes      *string `json:"notes,omitempty"`
 }

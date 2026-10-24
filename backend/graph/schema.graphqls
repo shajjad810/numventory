@@ -22,6 +22,9 @@ type Query {
   categories: [Category!]!
   products: [Product!]!
   locations: [Location!]!
+
+  inventory: [Inventory!]!
+  inventoryTransactions: [InventoryTransaction!]!
 }
 
 input CreateCategoryInput {
@@ -45,4 +48,32 @@ type Mutation {
   createCategory(input: CreateCategoryInput!): Category!
   createProduct(input: CreateProductInput!): Product!
   createLocation(input: CreateLocationInput!): Location!
+
+  receiveInventory(input: ReceiveInventoryInput!): InventoryTransaction!
+}
+
+type Inventory {
+  id: ID!
+  productId: ID!
+  locationId: ID!
+  quantity: Float!
+}
+
+type InventoryTransaction {
+  id: ID!
+  productId: ID!
+  locationId: ID!
+  transactionType: String!
+  quantity: Float!
+  reference: String
+  notes: String
+  createdAt: String!
+}
+
+input ReceiveInventoryInput {
+  productId: ID!
+  locationId: ID!
+  quantity: Float!
+  reference: String
+  notes: String
 }
