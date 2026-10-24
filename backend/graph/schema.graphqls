@@ -50,8 +50,9 @@ type Mutation {
   createLocation(input: CreateLocationInput!): Location!
   receiveInventory(input: ReceiveInventoryInput!): InventoryTransaction!
   shipInventory(input: ShipInventoryInput!): InventoryTransaction!
-
   recordWaste(input: RecordWasteInput!): InventoryTransaction!
+
+  processProduction(input: ProcessProductionInput!): [InventoryTransaction!]!
 }
 
 type Inventory {
@@ -93,6 +94,16 @@ input RecordWasteInput {
   locationId: ID!
   quantity: Float!
   reason: String!
+  reference: String
+  notes: String
+}
+
+input ProcessProductionInput {
+  rawProductId: ID!
+  finishedProductId: ID!
+  locationId: ID!
+  rawQuantity: Float!
+  finishedQuantity: Float!
   reference: String
   notes: String
 }

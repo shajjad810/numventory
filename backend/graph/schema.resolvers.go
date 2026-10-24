@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/shajjadhossen/numventory/backend/graph/model"
 )
 
@@ -378,6 +378,146 @@ func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWa
 		Notes:           &wasteNotes,
 		CreatedAt:       createdAt.Format(time.RFC3339),
 	}, nil
+}
+
+// ProcessProduction is the resolver for the processProduction field.
+func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.ProcessProductionInput) ([]*model.InventoryTransaction, error) {
+	// Validate both quantities.
+	validQuantity := func(q float64) bool {
+		return !math.IsNaN(q) &&
+			!math.IsInf(q, 0) &&
+			q > 0 &&
+			q <= 9999999999.99 &&
+			math.Abs(q*100-math.Round(q*100)) <= 1e-7
+	}
+
+	if !validQuantity(input.RawQuantity) || !validQuantity(input.FinishedQuantity) {
+		return nil, fmt.Errorf("quantities must be positive and have at most two decimal places")
+	}
+
+	rawProductID, err := strconv.ParseInt(input.RawProductID, 10, 64)
+	if err != nil || rawProductID <= 0 {
+		return nil, fmt.Errorf("invalid raw product ID")
+	}
+
+	finishedProductID, err := strconv.ParseInt(input.FinishedProductID, 10, 64)
+	if err != nil || finishedProductID <= 0 {
+		return nil, fmt.Errorf("invalid finished product ID")
+	}
+
+	if rawProductID == finishedProductID {
+		return nil, fmt.Errorf("raw product and finished product must be different")
+	}
+
+	locationID, err := strconv.ParseInt(input.LocationID, 10, 64)
+	if err != nil || locationID <= 0 {
+		return nil, fmt.Errorf("invalid location ID")
+	}
+
+	rawQuantity := strconv.FormatFloat(input.RawQuantity, 'f', 2, 64)
+	finishedQuantity := strconv.FormatFloat(input.FinishedQuantity, 'f', 2, 64)
+
+	// Both inventory changes must succeed together.
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin production transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Consume raw material only if enough stock exists.
+	var remainingRawQuantity string
+
+	err = tx.QueryRow(ctx, `
+        UPDATE inventory
+        SET quantity = quantity - $3::numeric,
+            updated_at = NOW()
+        WHERE product_id = $1
+          AND location_id = $2
+          AND quantity >= $3::numeric
+        RETURNING quantity::text
+    `, rawProductID, locationID, rawQuantity).Scan(&remainingRawQuantity)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("insufficient raw material inventory")
+		}
+		return nil, fmt.Errorf("consume raw material: %w", err)
+	}
+
+	// Add finished goods to inventory.
+	_, err = tx.Exec(ctx, `
+        INSERT INTO inventory (product_id, location_id, quantity)
+        VALUES ($1, $2, $3::numeric)
+        ON CONFLICT (product_id, location_id)
+        DO UPDATE SET
+            quantity = inventory.quantity + EXCLUDED.quantity,
+            updated_at = NOW()
+    `, finishedProductID, locationID, finishedQuantity)
+
+	if err != nil {
+		return nil, fmt.Errorf("add finished goods: %w", err)
+	}
+
+	// Record both movements in transaction history.
+	type movement struct {
+		productID int64
+		quantity  float64
+		direction string
+	}
+
+	movements := []movement{
+		{rawProductID, input.RawQuantity, "CONSUMED"},
+		{finishedProductID, input.FinishedQuantity, "PRODUCED"},
+	}
+
+	transactions := make([]*model.InventoryTransaction, 0, 2)
+
+	for _, movement := range movements {
+		notes := "Production " + movement.direction
+		if input.Notes != nil && strings.TrimSpace(*input.Notes) != "" {
+			notes += "\nNotes: " + strings.TrimSpace(*input.Notes)
+		}
+
+		quantityText := strconv.FormatFloat(movement.quantity, 'f', 2, 64)
+
+		var transactionID int64
+		var createdAt time.Time
+
+		err = tx.QueryRow(ctx, `
+            INSERT INTO inventory_transactions (
+                product_id,
+                location_id,
+                transaction_type,
+                quantity,
+                reference,
+                notes
+            )
+            VALUES ($1, $2, 'PRODUCTION', $3::numeric, $4, $5)
+            RETURNING id, created_at
+        `, movement.productID, locationID, quantityText, input.Reference, notes).
+			Scan(&transactionID, &createdAt)
+
+		if err != nil {
+			return nil, fmt.Errorf("record production movement: %w", err)
+		}
+
+		transactions = append(transactions, &model.InventoryTransaction{
+			ID:              strconv.FormatInt(transactionID, 10),
+			ProductID:       strconv.FormatInt(movement.productID, 10),
+			LocationID:      strconv.FormatInt(locationID, 10),
+			TransactionType: "PRODUCTION",
+			Quantity:        movement.quantity,
+			Reference:       input.Reference,
+			Notes:           &notes,
+			CreatedAt:       createdAt.Format(time.RFC3339),
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit production transaction: %w", err)
+	}
+
+	return transactions, nil
 }
 
 // Categories is the resolver for the categories field.

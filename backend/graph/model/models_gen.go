@@ -51,6 +51,16 @@ type Location struct {
 type Mutation struct {
 }
 
+type ProcessProductionInput struct {
+	RawProductID      string  `json:"rawProductId"`
+	FinishedProductID string  `json:"finishedProductId"`
+	LocationID        string  `json:"locationId"`
+	RawQuantity       float64 `json:"rawQuantity"`
+	FinishedQuantity  float64 `json:"finishedQuantity"`
+	Reference         *string `json:"reference,omitempty"`
+	Notes             *string `json:"notes,omitempty"`
+}
+
 type Product struct {
 	ID          string  `json:"id"`
 	Sku         string  `json:"sku"`
