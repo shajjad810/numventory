@@ -1,0 +1,48 @@
+type Category {
+  id: ID!
+  name: String!
+}
+
+type Product {
+  id: ID!
+  sku: String!
+  name: String!
+  description: String
+  categoryId: ID
+  unit: String!
+}
+
+type Location {
+  id: ID!
+  name: String!
+  description: String
+}
+
+type Query {
+  categories: [Category!]!
+  products: [Product!]!
+  locations: [Location!]!
+}
+
+input CreateCategoryInput {
+  name: String!
+}
+
+input CreateProductInput {
+  sku: String!
+  name: String!
+  description: String
+  categoryId: ID
+  unit: String!
+}
+
+input CreateLocationInput {
+  name: String!
+  description: String
+}
+
+type Mutation {
+  createCategory(input: CreateCategoryInput!): Category!
+  createProduct(input: CreateProductInput!): Product!
+  createLocation(input: CreateLocationInput!): Location!
+}
