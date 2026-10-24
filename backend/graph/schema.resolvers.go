@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -273,6 +274,108 @@ func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipIn
 		Quantity:        input.Quantity,
 		Reference:       input.Reference,
 		Notes:           input.Notes,
+		CreatedAt:       createdAt.Format(time.RFC3339),
+	}, nil
+}
+
+// RecordWaste is the resolver for the recordWaste field.
+func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWasteInput) (*model.InventoryTransaction, error) {
+	// Validate quantity.
+	if math.IsNaN(input.Quantity) ||
+		math.IsInf(input.Quantity, 0) ||
+		input.Quantity <= 0 ||
+		input.Quantity > 9999999999.99 ||
+		math.Abs(input.Quantity*100-math.Round(input.Quantity*100)) > 1e-7 {
+		return nil, fmt.Errorf("quantity must be positive and have at most two decimal places")
+	}
+
+	// Waste must have a reason.
+	reason := strings.TrimSpace(input.Reason)
+	if reason == "" {
+		return nil, fmt.Errorf("waste reason is required")
+	}
+
+	productID, err := strconv.ParseInt(input.ProductID, 10, 64)
+	if err != nil || productID <= 0 {
+		return nil, fmt.Errorf("invalid product ID")
+	}
+
+	locationID, err := strconv.ParseInt(input.LocationID, 10, 64)
+	if err != nil || locationID <= 0 {
+		return nil, fmt.Errorf("invalid location ID")
+	}
+
+	quantity := strconv.FormatFloat(input.Quantity, 'f', 2, 64)
+
+	// Combine reason and optional notes.
+	wasteNotes := "Reason: " + reason
+	if input.Notes != nil && strings.TrimSpace(*input.Notes) != "" {
+		wasteNotes += "\nNotes: " + strings.TrimSpace(*input.Notes)
+	}
+
+	// Start a database transaction.
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin waste transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Subtract stock only when enough inventory exists.
+	var remainingQuantity string
+
+	err = tx.QueryRow(ctx, `
+        UPDATE inventory
+        SET
+            quantity = quantity - $3::numeric,
+            updated_at = NOW()
+        WHERE product_id = $1
+          AND location_id = $2
+          AND quantity >= $3::numeric
+        RETURNING quantity::text
+    `, productID, locationID, quantity).Scan(&remainingQuantity)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("insufficient inventory: cannot record more waste than available stock")
+		}
+		return nil, fmt.Errorf("update inventory for waste: %w", err)
+	}
+
+	// Record waste in transaction history.
+	var transactionID int64
+	var createdAt time.Time
+
+	err = tx.QueryRow(ctx, `
+        INSERT INTO inventory_transactions (
+            product_id,
+            location_id,
+            transaction_type,
+            quantity,
+            reference,
+            notes
+        )
+        VALUES ($1, $2, 'WASTE', $3::numeric, $4, $5)
+        RETURNING id, created_at
+    `, productID, locationID, quantity, input.Reference, wasteNotes).
+		Scan(&transactionID, &createdAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("record waste transaction: %w", err)
+	}
+
+	// Commit both changes together.
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit waste transaction: %w", err)
+	}
+
+	return &model.InventoryTransaction{
+		ID:              strconv.FormatInt(transactionID, 10),
+		ProductID:       input.ProductID,
+		LocationID:      input.LocationID,
+		TransactionType: "WASTE",
+		Quantity:        input.Quantity,
+		Reference:       input.Reference,
+		Notes:           &wasteNotes,
 		CreatedAt:       createdAt.Format(time.RFC3339),
 	}, nil
 }
