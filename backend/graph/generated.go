@@ -50,12 +50,14 @@ type ComplexityRoot struct {
 
 	InventoryTransaction struct {
 		CreatedAt       func(childComplexity int) int
+		FromLocationID  func(childComplexity int) int
 		ID              func(childComplexity int) int
 		LocationID      func(childComplexity int) int
 		Notes           func(childComplexity int) int
 		ProductID       func(childComplexity int) int
 		Quantity        func(childComplexity int) int
 		Reference       func(childComplexity int) int
+		ToLocationID    func(childComplexity int) int
 		TransactionType func(childComplexity int) int
 	}
 
@@ -73,6 +75,7 @@ type ComplexityRoot struct {
 		ReceiveInventory  func(childComplexity int, input model.ReceiveInventoryInput) int
 		RecordWaste       func(childComplexity int, input model.RecordWasteInput) int
 		ShipInventory     func(childComplexity int, input model.ShipInventoryInput) int
+		TransferInventory func(childComplexity int, input model.TransferInventoryInput) int
 	}
 
 	Product struct {
@@ -105,6 +108,7 @@ type MutationResolver interface {
 	ShipInventory(ctx context.Context, input model.ShipInventoryInput) (*model.InventoryTransaction, error)
 	RecordWaste(ctx context.Context, input model.RecordWasteInput) (*model.InventoryTransaction, error)
 	ProcessProduction(ctx context.Context, input model.ProcessProductionInput) ([]*model.InventoryTransaction, error)
+	TransferInventory(ctx context.Context, input model.TransferInventoryInput) (*model.InventoryTransaction, error)
 }
 type QueryResolver interface {
 	Categories(ctx context.Context) ([]*model.Category, error)
@@ -176,6 +180,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.InventoryTransaction.CreatedAt(childComplexity), true
+	case "InventoryTransaction.fromLocationId":
+		if e.ComplexityRoot.InventoryTransaction.FromLocationID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InventoryTransaction.FromLocationID(childComplexity), true
 	case "InventoryTransaction.id":
 		if e.ComplexityRoot.InventoryTransaction.ID == nil {
 			break
@@ -212,6 +222,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.InventoryTransaction.Reference(childComplexity), true
+	case "InventoryTransaction.toLocationId":
+		if e.ComplexityRoot.InventoryTransaction.ToLocationID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InventoryTransaction.ToLocationID(childComplexity), true
 	case "InventoryTransaction.transactionType":
 		if e.ComplexityRoot.InventoryTransaction.TransactionType == nil {
 			break
@@ -315,6 +331,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ShipInventory(childComplexity, args["input"].(model.ShipInventoryInput)), true
+	case "Mutation.transferInventory":
+		if e.ComplexityRoot.Mutation.TransferInventory == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_transferInventory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.TransferInventory(childComplexity, args["input"].(model.TransferInventoryInput)), true
 
 	case "Product.categoryId":
 		if e.ComplexityRoot.Product.CategoryID == nil {
@@ -401,6 +428,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("ReceiveInventoryInput", ec.unmarshalInputReceiveInventoryInput),
 			graphql.NewInputUnmarshaler("RecordWasteInput", ec.unmarshalInputRecordWasteInput),
 			graphql.NewInputUnmarshaler("ShipInventoryInput", ec.unmarshalInputShipInventoryInput),
+			graphql.NewInputUnmarshaler("TransferInventoryInput", ec.unmarshalInputTransferInventoryInput),
 		)
 	}
 	first := true
@@ -538,6 +566,10 @@ func (ec *executionContext) childFields_InventoryTransaction(ctx context.Context
 		return ec.fieldContext_InventoryTransaction_notes(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_InventoryTransaction_createdAt(ctx, field)
+	case "fromLocationId":
+		return ec.fieldContext_InventoryTransaction_fromLocationId(ctx, field)
+	case "toLocationId":
+		return ec.fieldContext_InventoryTransaction_toLocationId(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type InventoryTransaction", field.Name)
 }
@@ -778,6 +810,20 @@ func (ec *executionContext) field_Mutation_shipInventory_args(ctx context.Contex
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.ShipInventoryInput, error) {
 			return ec.unmarshalNShipInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐShipInventoryInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_transferInventory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.TransferInventoryInput, error) {
+			return ec.unmarshalNTransferInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐTransferInventoryInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -1196,6 +1242,52 @@ func (ec *executionContext) fieldContext_InventoryTransaction_createdAt(_ contex
 	return graphql.NewScalarFieldContext("InventoryTransaction", field, false, false, "String")
 }
 
+func (ec *executionContext) _InventoryTransaction_fromLocationId(ctx context.Context, field graphql.CollectedField, obj *model.InventoryTransaction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InventoryTransaction_fromLocationId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FromLocationID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOID2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_InventoryTransaction_fromLocationId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InventoryTransaction", field, false, false, "ID")
+}
+
+func (ec *executionContext) _InventoryTransaction_toLocationId(ctx context.Context, field graphql.CollectedField, obj *model.InventoryTransaction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InventoryTransaction_toLocationId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ToLocationID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOID2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_InventoryTransaction_toLocationId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InventoryTransaction", field, false, false, "ID")
+}
+
 func (ec *executionContext) _Location_id(ctx context.Context, field graphql.CollectedField, obj *model.Location) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1567,6 +1659,50 @@ func (ec *executionContext) fieldContext_Mutation_processProduction(ctx context.
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_processProduction_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_transferInventory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_transferInventory(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().TransferInventory(ctx, fc.Args["input"].(model.TransferInventoryInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.InventoryTransaction) graphql.Marshaler {
+			return ec.marshalNInventoryTransaction2ᚖgithubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐInventoryTransaction(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_transferInventory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InventoryTransaction(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_transferInventory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3482,6 +3618,83 @@ func UnmarshalShipInventoryInput(ctx context.Context, raw any) (model.ShipInvent
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputTransferInventoryInput(ctx context.Context, obj any) (model.TransferInventoryInput, error) {
+	var it model.TransferInventoryInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"productId", "fromLocationId", "toLocationId", "quantity", "reference", "notes"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProductID = data
+		case "fromLocationId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("fromLocationId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FromLocationID = data
+		case "toLocationId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("toLocationId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ToLocationID = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		case "reference":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reference"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Reference = data
+		case "notes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notes"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Notes = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalTransferInventoryInput unmarshals raw into the TransferInventoryInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalTransferInventoryInput(ctx context.Context, raw any) (model.TransferInventoryInput, error) {
+	var out model.TransferInventoryInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "TransferInventoryInput", raw, &out)
+	return out, err
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -3627,6 +3840,16 @@ func (ec *executionContext) _InventoryTransaction(ctx context.Context, sel ast.S
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "fromLocationId":
+			out.Values[i] = ec._InventoryTransaction_fromLocationId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "toLocationId":
+			out.Values[i] = ec._InventoryTransaction_toLocationId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3751,6 +3974,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "processProduction":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_processProduction(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "transferInventory":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_transferInventory(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -4481,6 +4711,11 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		graphql.AddInvalidNullFromMarshaler(ctx, "String!")
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNTransferInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐTransferInventoryInput(ctx context.Context, v any) (model.TransferInventoryInput, error) {
+	res, err := ec.unmarshalInputTransferInventoryInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {

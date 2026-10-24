@@ -40,6 +40,8 @@ type InventoryTransaction struct {
 	Reference       *string `json:"reference,omitempty"`
 	Notes           *string `json:"notes,omitempty"`
 	CreatedAt       string  `json:"createdAt"`
+	FromLocationID  *string `json:"fromLocationId,omitempty"`
+	ToLocationID    *string `json:"toLocationId,omitempty"`
 }
 
 type Location struct {
@@ -96,4 +98,13 @@ type ShipInventoryInput struct {
 	Quantity   float64 `json:"quantity"`
 	Reference  *string `json:"reference,omitempty"`
 	Notes      *string `json:"notes,omitempty"`
+}
+
+type TransferInventoryInput struct {
+	ProductID      string  `json:"productId"`
+	FromLocationID string  `json:"fromLocationId"`
+	ToLocationID   string  `json:"toLocationId"`
+	Quantity       float64 `json:"quantity"`
+	Reference      *string `json:"reference,omitempty"`
+	Notes          *string `json:"notes,omitempty"`
 }

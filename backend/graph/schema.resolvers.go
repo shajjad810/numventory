@@ -520,6 +520,136 @@ func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.Pr
 	return transactions, nil
 }
 
+// TransferInventory is the resolver for the transferInventory field.
+func (r *mutationResolver) TransferInventory(ctx context.Context, input model.TransferInventoryInput) (*model.InventoryTransaction, error) {
+	// 1. Validate the transfer quantity.
+	quantity := input.Quantity
+
+	if math.IsNaN(quantity) ||
+		math.IsInf(quantity, 0) ||
+		quantity <= 0 ||
+		quantity > 9999999999.99 ||
+		math.Abs(quantity*100-math.Round(quantity*100)) > 1e-7 {
+		return nil, fmt.Errorf("quantity must be positive and have at most two decimal places")
+	}
+
+	// 2. Validate product and location IDs.
+	productID, err := strconv.ParseInt(input.ProductID, 10, 64)
+	if err != nil || productID <= 0 {
+		return nil, fmt.Errorf("invalid product ID")
+	}
+
+	fromLocationID, err := strconv.ParseInt(input.FromLocationID, 10, 64)
+	if err != nil || fromLocationID <= 0 {
+		return nil, fmt.Errorf("invalid source location ID")
+	}
+
+	toLocationID, err := strconv.ParseInt(input.ToLocationID, 10, 64)
+	if err != nil || toLocationID <= 0 {
+		return nil, fmt.Errorf("invalid destination location ID")
+	}
+
+	if fromLocationID == toLocationID {
+		return nil, fmt.Errorf("source and destination locations must be different")
+	}
+
+	quantityText := strconv.FormatFloat(quantity, 'f', 2, 64)
+
+	// 3. Start a database transaction.
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin inventory transfer: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 4. Deduct stock from the source location.
+	var remainingQuantity string
+
+	err = tx.QueryRow(ctx, `
+        UPDATE inventory
+        SET quantity = quantity - $3::numeric,
+            updated_at = NOW()
+        WHERE product_id = $1
+          AND location_id = $2
+          AND quantity >= $3::numeric
+        RETURNING quantity::text
+    `, productID, fromLocationID, quantityText).Scan(&remainingQuantity)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("insufficient inventory at source location")
+		}
+		return nil, fmt.Errorf("deduct source inventory: %w", err)
+	}
+
+	// 5. Add stock to the destination location.
+	_, err = tx.Exec(ctx, `
+        INSERT INTO inventory (product_id, location_id, quantity)
+        VALUES ($1, $2, $3::numeric)
+        ON CONFLICT (product_id, location_id)
+        DO UPDATE SET
+            quantity = inventory.quantity + EXCLUDED.quantity,
+            updated_at = NOW()
+    `, productID, toLocationID, quantityText)
+
+	if err != nil {
+		return nil, fmt.Errorf("add destination inventory: %w", err)
+	}
+
+	// 6. Record the transfer in transaction history.
+	var transactionID int64
+	var createdAt time.Time
+
+	err = tx.QueryRow(ctx, `
+        INSERT INTO inventory_transactions (
+            product_id,
+            location_id,
+            from_location_id,
+            to_location_id,
+            transaction_type,
+            quantity,
+            reference,
+            notes
+        )
+        VALUES ($1, $2, $3, $4, 'TRANSFER', $5::numeric, $6, $7)
+        RETURNING id, created_at
+    `,
+		productID,
+		fromLocationID,
+		fromLocationID,
+		toLocationID,
+		quantityText,
+		input.Reference,
+		input.Notes,
+	).Scan(&transactionID, &createdAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("record inventory transfer: %w", err)
+	}
+
+	// 7. Commit all changes together.
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit inventory transfer: %w", err)
+	}
+
+	// 8. Return the recorded transfer.
+	fromID := strconv.FormatInt(fromLocationID, 10)
+	toID := strconv.FormatInt(toLocationID, 10)
+
+	return &model.InventoryTransaction{
+		ID:              strconv.FormatInt(transactionID, 10),
+		ProductID:       strconv.FormatInt(productID, 10),
+		LocationID:      fromID,
+		FromLocationID:  &fromID,
+		ToLocationID:    &toID,
+		TransactionType: "TRANSFER",
+		Quantity:        quantity,
+		Reference:       input.Reference,
+		Notes:           input.Notes,
+		CreatedAt:       createdAt.Format(time.RFC3339),
+	}, nil
+}
+
 // Categories is the resolver for the categories field.
 func (r *queryResolver) Categories(ctx context.Context) ([]*model.Category, error) {
 	rows, err := r.DB.Query(
@@ -692,18 +822,20 @@ func (r *queryResolver) Inventory(ctx context.Context) ([]*model.Inventory, erro
 // InventoryTransactions is the resolver for the inventoryTransactions field.
 func (r *queryResolver) InventoryTransactions(ctx context.Context) ([]*model.InventoryTransaction, error) {
 	rows, err := r.DB.Query(ctx, `
-        SELECT
-            id,
-            product_id,
-            location_id,
-            transaction_type,
-            quantity::text,
-            reference,
-            notes,
-            created_at
-        FROM inventory_transactions
-        ORDER BY created_at DESC, id DESC
-    `)
+		SELECT
+			id,
+			product_id,
+			location_id,
+			from_location_id,
+			to_location_id,
+			transaction_type,
+			quantity::text,
+			reference,
+			notes,
+			created_at
+		FROM inventory_transactions
+		ORDER BY created_at DESC, id DESC
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("fetch inventory transactions: %w", err)
 	}
@@ -713,6 +845,7 @@ func (r *queryResolver) InventoryTransactions(ctx context.Context) ([]*model.Inv
 
 	for rows.Next() {
 		var id, productID, locationID int64
+		var fromLocationID, toLocationID *int64
 		var transactionType string
 		var quantityText string
 		var reference, notes *string
@@ -722,6 +855,8 @@ func (r *queryResolver) InventoryTransactions(ctx context.Context) ([]*model.Inv
 			&id,
 			&productID,
 			&locationID,
+			&fromLocationID,
+			&toLocationID,
 			&transactionType,
 			&quantityText,
 			&reference,
@@ -737,10 +872,25 @@ func (r *queryResolver) InventoryTransactions(ctx context.Context) ([]*model.Inv
 			return nil, fmt.Errorf("parse transaction quantity: %w", err)
 		}
 
+		// Convert nullable database IDs into nullable GraphQL IDs.
+		var fromID, toID *string
+
+		if fromLocationID != nil {
+			value := strconv.FormatInt(*fromLocationID, 10)
+			fromID = &value
+		}
+
+		if toLocationID != nil {
+			value := strconv.FormatInt(*toLocationID, 10)
+			toID = &value
+		}
+
 		transactions = append(transactions, &model.InventoryTransaction{
 			ID:              strconv.FormatInt(id, 10),
 			ProductID:       strconv.FormatInt(productID, 10),
 			LocationID:      strconv.FormatInt(locationID, 10),
+			FromLocationID:  fromID,
+			ToLocationID:    toID,
 			TransactionType: transactionType,
 			Quantity:        quantity,
 			Reference:       reference,
