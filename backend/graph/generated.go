@@ -70,6 +70,7 @@ type ComplexityRoot struct {
 		CreateLocation   func(childComplexity int, input model.CreateLocationInput) int
 		CreateProduct    func(childComplexity int, input model.CreateProductInput) int
 		ReceiveInventory func(childComplexity int, input model.ReceiveInventoryInput) int
+		ShipInventory    func(childComplexity int, input model.ShipInventoryInput) int
 	}
 
 	Product struct {
@@ -99,6 +100,7 @@ type MutationResolver interface {
 	CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error)
 	CreateLocation(ctx context.Context, input model.CreateLocationInput) (*model.Location, error)
 	ReceiveInventory(ctx context.Context, input model.ReceiveInventoryInput) (*model.InventoryTransaction, error)
+	ShipInventory(ctx context.Context, input model.ShipInventoryInput) (*model.InventoryTransaction, error)
 }
 type QueryResolver interface {
 	Categories(ctx context.Context) ([]*model.Category, error)
@@ -276,6 +278,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReceiveInventory(childComplexity, args["input"].(model.ReceiveInventoryInput)), true
+	case "Mutation.shipInventory":
+		if e.ComplexityRoot.Mutation.ShipInventory == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_shipInventory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ShipInventory(childComplexity, args["input"].(model.ShipInventoryInput)), true
 
 	case "Product.categoryId":
 		if e.ComplexityRoot.Product.CategoryID == nil {
@@ -359,6 +372,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateLocationInput", ec.unmarshalInputCreateLocationInput),
 			graphql.NewInputUnmarshaler("CreateProductInput", ec.unmarshalInputCreateProductInput),
 			graphql.NewInputUnmarshaler("ReceiveInventoryInput", ec.unmarshalInputReceiveInventoryInput),
+			graphql.NewInputUnmarshaler("ShipInventoryInput", ec.unmarshalInputShipInventoryInput),
 		)
 	}
 	first := true
@@ -694,6 +708,20 @@ func (ec *executionContext) field_Mutation_receiveInventory_args(ctx context.Con
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.ReceiveInventoryInput, error) {
 			return ec.unmarshalNReceiveInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐReceiveInventoryInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_shipInventory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.ShipInventoryInput, error) {
+			return ec.unmarshalNShipInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐShipInventoryInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -1351,6 +1379,50 @@ func (ec *executionContext) fieldContext_Mutation_receiveInventory(ctx context.C
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_receiveInventory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_shipInventory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_shipInventory(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ShipInventory(ctx, fc.Args["input"].(model.ShipInventoryInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.InventoryTransaction) graphql.Marshaler {
+			return ec.marshalNInventoryTransaction2ᚖgithubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐInventoryTransaction(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_shipInventory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InventoryTransaction(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_shipInventory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3035,6 +3107,76 @@ func UnmarshalReceiveInventoryInput(ctx context.Context, raw any) (model.Receive
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputShipInventoryInput(ctx context.Context, obj any) (model.ShipInventoryInput, error) {
+	var it model.ShipInventoryInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"productId", "locationId", "quantity", "reference", "notes"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProductID = data
+		case "locationId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("locationId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LocationID = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		case "reference":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reference"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Reference = data
+		case "notes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notes"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Notes = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalShipInventoryInput unmarshals raw into the ShipInventoryInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalShipInventoryInput(ctx context.Context, raw any) (model.ShipInventoryInput, error) {
+	var out model.ShipInventoryInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "ShipInventoryInput", raw, &out)
+	return out, err
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -3283,6 +3425,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "receiveInventory":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_receiveInventory(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "shipInventory":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_shipInventory(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -3983,6 +4132,11 @@ func (ec *executionContext) marshalNProduct2ᚖgithubᚗcomᚋshajjadhossenᚋnu
 
 func (ec *executionContext) unmarshalNReceiveInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐReceiveInventoryInput(ctx context.Context, v any) (model.ReceiveInventoryInput, error) {
 	res, err := ec.unmarshalInputReceiveInventoryInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNShipInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐShipInventoryInput(ctx context.Context, v any) (model.ShipInventoryInput, error) {
+	res, err := ec.unmarshalInputShipInventoryInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 

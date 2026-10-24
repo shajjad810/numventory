@@ -7,11 +7,13 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/shajjadhossen/numventory/backend/graph/model"
 )
 
@@ -175,6 +177,99 @@ func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.Rec
 		ProductID:       input.ProductID,
 		LocationID:      input.LocationID,
 		TransactionType: "RECEIVING",
+		Quantity:        input.Quantity,
+		Reference:       input.Reference,
+		Notes:           input.Notes,
+		CreatedAt:       createdAt.Format(time.RFC3339),
+	}, nil
+}
+
+// ShipInventory is the resolver for the shipInventory field.
+func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipInventoryInput) (*model.InventoryTransaction, error) {
+	// Validate the shipping quantity.
+	if math.IsNaN(input.Quantity) ||
+		math.IsInf(input.Quantity, 0) ||
+		input.Quantity <= 0 ||
+		input.Quantity > 9999999999.99 ||
+		math.Abs(input.Quantity*100-math.Round(input.Quantity*100)) > 1e-7 {
+		return nil, fmt.Errorf("quantity must be positive and have at most two decimal places")
+	}
+
+	productID, err := strconv.ParseInt(input.ProductID, 10, 64)
+	if err != nil || productID <= 0 {
+		return nil, fmt.Errorf("invalid product ID")
+	}
+
+	locationID, err := strconv.ParseInt(input.LocationID, 10, 64)
+	if err != nil || locationID <= 0 {
+		return nil, fmt.Errorf("invalid location ID")
+	}
+
+	// PostgreSQL NUMERIC(12,2) accepts this decimal representation.
+	quantity := strconv.FormatFloat(input.Quantity, 'f', 2, 64)
+
+	// Start a database transaction.
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin shipping transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Decrease inventory only when sufficient stock exists.
+	// The UPDATE locks the matching row, protecting against
+	// concurrent requests shipping the same stock.
+	var remainingQuantity string
+
+	err = tx.QueryRow(ctx, `
+        UPDATE inventory
+        SET
+            quantity = quantity - $3::numeric,
+            updated_at = NOW()
+        WHERE product_id = $1
+          AND location_id = $2
+          AND quantity >= $3::numeric
+        RETURNING quantity::text
+    `, productID, locationID, quantity).Scan(&remainingQuantity)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("insufficient inventory: no stock available or requested quantity exceeds available stock")
+		}
+		return nil, fmt.Errorf("update inventory: %w", err)
+	}
+
+	// Record the shipping transaction.
+	var transactionID int64
+	var createdAt time.Time
+
+	err = tx.QueryRow(ctx, `
+        INSERT INTO inventory_transactions (
+            product_id,
+            location_id,
+            transaction_type,
+            quantity,
+            reference,
+            notes
+        )
+        VALUES ($1, $2, 'SHIPPING', $3::numeric, $4, $5)
+        RETURNING id, created_at
+    `, productID, locationID, quantity, input.Reference, input.Notes).
+		Scan(&transactionID, &createdAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("record shipping transaction: %w", err)
+	}
+
+	// Save the stock update and history together.
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit shipping transaction: %w", err)
+	}
+
+	return &model.InventoryTransaction{
+		ID:              strconv.FormatInt(transactionID, 10),
+		ProductID:       input.ProductID,
+		LocationID:      input.LocationID,
+		TransactionType: "SHIPPING",
 		Quantity:        input.Quantity,
 		Reference:       input.Reference,
 		Notes:           input.Notes,

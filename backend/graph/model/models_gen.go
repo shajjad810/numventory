@@ -70,3 +70,11 @@ type ReceiveInventoryInput struct {
 	Reference  *string `json:"reference,omitempty"`
 	Notes      *string `json:"notes,omitempty"`
 }
+
+type ShipInventoryInput struct {
+	ProductID  string  `json:"productId"`
+	LocationID string  `json:"locationId"`
+	Quantity   float64 `json:"quantity"`
+	Reference  *string `json:"reference,omitempty"`
+	Notes      *string `json:"notes,omitempty"`
+}

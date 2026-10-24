@@ -48,8 +48,9 @@ type Mutation {
   createCategory(input: CreateCategoryInput!): Category!
   createProduct(input: CreateProductInput!): Product!
   createLocation(input: CreateLocationInput!): Location!
-
   receiveInventory(input: ReceiveInventoryInput!): InventoryTransaction!
+
+  shipInventory(input: ShipInventoryInput!): InventoryTransaction!
 }
 
 type Inventory {
@@ -71,6 +72,14 @@ type InventoryTransaction {
 }
 
 input ReceiveInventoryInput {
+  productId: ID!
+  locationId: ID!
+  quantity: Float!
+  reference: String
+  notes: String
+}
+
+input ShipInventoryInput {
   productId: ID!
   locationId: ID!
   quantity: Float!
