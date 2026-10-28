@@ -10,12 +10,18 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/mail"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shajjadhossen/numventory/backend/graph/model"
+	"github.com/shajjadhossen/numventory/backend/internal/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // CreateCategory is the resolver for the createCategory field.
@@ -104,6 +110,12 @@ func (r *mutationResolver) CreateLocation(ctx context.Context, input model.Creat
 
 // ReceiveInventory is the resolver for the receiveInventory field.
 func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.ReceiveInventoryInput) (*model.InventoryTransaction, error) {
+
+	userID, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Validate the quantity before touching the database.
 	if math.IsNaN(input.Quantity) ||
 		math.IsInf(input.Quantity, 0) ||
@@ -151,17 +163,18 @@ func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.Rec
 	var createdAt time.Time
 
 	err = tx.QueryRow(ctx, `
-        INSERT INTO inventory_transactions (
-            product_id,
-            location_id,
-            transaction_type,
-            quantity,
-            reference,
-            notes
-        )
-        VALUES ($1, $2, 'RECEIVING', $3::numeric, $4, $5)
-        RETURNING id, created_at
-    `, productID, locationID, quantity, input.Reference, input.Notes).
+    INSERT INTO inventory_transactions (
+        product_id,
+        location_id,
+        user_id,
+        transaction_type,
+        quantity,
+        reference,
+        notes
+    )
+    VALUES ($1, $2, $3, 'RECEIVING', $4::numeric, $5, $6)
+    RETURNING id, created_at
+`, productID, locationID, userID, quantity, input.Reference, input.Notes).
 		Scan(&transactionID, &createdAt)
 
 	if err != nil {
@@ -647,6 +660,130 @@ func (r *mutationResolver) TransferInventory(ctx context.Context, input model.Tr
 		Reference:       input.Reference,
 		Notes:           input.Notes,
 		CreatedAt:       createdAt.Format(time.RFC3339),
+	}, nil
+}
+
+// RegisterUser is the resolver for the registerUser field.
+func (r *mutationResolver) RegisterUser(ctx context.Context, input model.RegisterUserInput) (*model.User, error) {
+	// Validate the user's name.
+	name := strings.TrimSpace(input.Name)
+	if name == "" || len(name) > 100 {
+		return nil, fmt.Errorf("name must be between 1 and 100 characters")
+	}
+
+	// Normalize and validate the email address.
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+	parsedEmail, err := mail.ParseAddress(email)
+	if err != nil || parsedEmail.Address != email || len(email) > 254 {
+		return nil, fmt.Errorf("invalid email address")
+	}
+
+	// Validate password length before hashing.
+	if len(input.Password) < 8 || len(input.Password) > 72 {
+		return nil, fmt.Errorf("password must be between 8 and 72 bytes")
+	}
+
+	// Hash the password securely using bcrypt.
+	passwordHash, err := bcrypt.GenerateFromPassword(
+		[]byte(input.Password),
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to secure password")
+	}
+
+	// Insert the new user into PostgreSQL.
+	var userID int64
+	var createdAt time.Time
+
+	err = r.DB.QueryRow(ctx, `
+        INSERT INTO users (name, email, password_hash)
+        VALUES ($1, $2, $3)
+        RETURNING id, created_at
+    `, name, email, string(passwordHash)).Scan(&userID, &createdAt)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, fmt.Errorf("an account with this email already exists")
+		}
+
+		return nil, fmt.Errorf("failed to register user")
+	}
+
+	return &model.User{
+		ID:        strconv.FormatInt(userID, 10),
+		Name:      name,
+		Email:     email,
+		CreatedAt: createdAt.Format(time.RFC3339),
+	}, nil
+}
+
+// Login is the resolver for the login field.
+func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+
+	// Retrieve the user and stored password hash.
+	var userID int64
+	var name, storedEmail, passwordHash string
+	var createdAt time.Time
+
+	err := r.DB.QueryRow(ctx, `
+        SELECT id, name, email, password_hash, created_at
+        FROM users
+        WHERE email = $1
+    `, email).Scan(
+		&userID,
+		&name,
+		&storedEmail,
+		&passwordHash,
+		&createdAt,
+	)
+
+	// Use a generic error to avoid revealing whether an email exists.
+	if err != nil {
+		return nil, fmt.Errorf("invalid email or password")
+	}
+
+	// Verify the submitted password against the stored bcrypt hash.
+	err = bcrypt.CompareHashAndPassword(
+		[]byte(passwordHash),
+		[]byte(input.Password),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("invalid email or password")
+	}
+
+	// Read the signing secret from the environment.
+	secret := os.Getenv("JWT_SECRET")
+	if len(secret) < 32 {
+		return nil, fmt.Errorf("authentication is not configured")
+	}
+
+	// Generate a JWT that expires after 24 hours.
+	now := time.Now()
+	claims := jwt.RegisteredClaims{
+		Subject:   strconv.FormatInt(userID, 10),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	signedToken, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate authentication token")
+	}
+
+	return &model.AuthPayload{
+		Token: signedToken,
+		User: &model.User{
+			ID:        strconv.FormatInt(userID, 10),
+			Name:      name,
+			Email:     storedEmail,
+			CreatedAt: createdAt.Format(time.RFC3339),
+		},
 	}, nil
 }
 

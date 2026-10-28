@@ -2,6 +2,11 @@
 
 package model
 
+type AuthPayload struct {
+	Token string `json:"token"`
+	User  *User  `json:"user"`
+}
+
 type Category struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -50,6 +55,11 @@ type Location struct {
 	Description *string `json:"description,omitempty"`
 }
 
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type Mutation struct {
 }
 
@@ -92,6 +102,12 @@ type RecordWasteInput struct {
 	Notes      *string `json:"notes,omitempty"`
 }
 
+type RegisterUserInput struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type ShipInventoryInput struct {
 	ProductID  string  `json:"productId"`
 	LocationID string  `json:"locationId"`
@@ -107,4 +123,11 @@ type TransferInventoryInput struct {
 	Quantity       float64 `json:"quantity"`
 	Reference      *string `json:"reference,omitempty"`
 	Notes          *string `json:"notes,omitempty"`
+}
+
+type User struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"createdAt"`
 }

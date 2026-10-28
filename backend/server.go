@@ -10,6 +10,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 
 	"github.com/shajjadhossen/numventory/backend/graph"
+	"github.com/shajjadhossen/numventory/backend/internal/auth"
 	"github.com/shajjadhossen/numventory/backend/internal/database"
 )
 
@@ -40,7 +41,7 @@ func main() {
 	)
 
 	http.Handle("/", playground.Handler("Numventory GraphQL", "/query"))
-	http.Handle("/query", srv)
+	http.Handle("/query", auth.Middleware(srv))
 
 	log.Printf("Numventory API running at http://localhost:%s/", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))

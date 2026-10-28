@@ -18,6 +18,29 @@ type Location {
   description: String
 }
 
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  createdAt: String!
+}
+
+input RegisterUserInput {
+  name: String!
+  email: String!
+  password: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
 type Query {
   categories: [Category!]!
   products: [Product!]!
@@ -53,6 +76,8 @@ type Mutation {
   recordWaste(input: RecordWasteInput!): InventoryTransaction!
   processProduction(input: ProcessProductionInput!): [InventoryTransaction!]!
   transferInventory(input: TransferInventoryInput!): InventoryTransaction!
+  registerUser(input: RegisterUserInput!): User!
+  login(input: LoginInput!): AuthPayload!
 }
 
 type Inventory {
