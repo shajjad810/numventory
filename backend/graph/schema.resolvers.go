@@ -26,10 +26,16 @@ import (
 
 // CreateCategory is the resolver for the createCategory field.
 func (r *mutationResolver) CreateCategory(ctx context.Context, input model.CreateCategoryInput) (*model.Category, error) {
+	// Require authentication.
+	_, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var id int64
 	var name string
 
-	err := r.DB.QueryRow(
+	err = r.DB.QueryRow(
 		ctx,
 		"INSERT INTO categories (name) VALUES ($1) RETURNING id, name",
 		input.Name,
@@ -47,6 +53,11 @@ func (r *mutationResolver) CreateCategory(ctx context.Context, input model.Creat
 
 // CreateProduct is the resolver for the createProduct field.
 func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
+
+	_, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var id int64
 
 	var categoryID *int64
@@ -58,7 +69,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		categoryID = &parsedID
 	}
 
-	err := r.DB.QueryRow(
+	err = r.DB.QueryRow(
 		ctx,
 		`INSERT INTO products (sku, name, description, category_id, unit)
          VALUES ($1, $2, $3, $4, $5)
@@ -86,9 +97,15 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 
 // CreateLocation is the resolver for the createLocation field.
 func (r *mutationResolver) CreateLocation(ctx context.Context, input model.CreateLocationInput) (*model.Location, error) {
+	// Require authentication.
+	_, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var id int64
 
-	err := r.DB.QueryRow(
+	err = r.DB.QueryRow(
 		ctx,
 		`INSERT INTO locations (name, description)
          VALUES ($1, $2)
@@ -200,6 +217,11 @@ func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.Rec
 
 // ShipInventory is the resolver for the shipInventory field.
 func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipInventoryInput) (*model.InventoryTransaction, error) {
+
+	userID, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// Validate the shipping quantity.
 	if math.IsNaN(input.Quantity) ||
 		math.IsInf(input.Quantity, 0) ||
@@ -257,17 +279,18 @@ func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipIn
 	var createdAt time.Time
 
 	err = tx.QueryRow(ctx, `
-        INSERT INTO inventory_transactions (
-            product_id,
-            location_id,
-            transaction_type,
-            quantity,
-            reference,
-            notes
-        )
-        VALUES ($1, $2, 'SHIPPING', $3::numeric, $4, $5)
-        RETURNING id, created_at
-    `, productID, locationID, quantity, input.Reference, input.Notes).
+    INSERT INTO inventory_transactions (
+        product_id,
+        location_id,
+        user_id,
+        transaction_type,
+        quantity,
+        reference,
+        notes
+    )
+    VALUES ($1, $2, $3, 'SHIPPING', $4::numeric, $5, $6)
+    RETURNING id, created_at
+`, productID, locationID, userID, quantity, input.Reference, input.Notes).
 		Scan(&transactionID, &createdAt)
 
 	if err != nil {
@@ -293,6 +316,11 @@ func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipIn
 
 // RecordWaste is the resolver for the recordWaste field.
 func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWasteInput) (*model.InventoryTransaction, error) {
+
+	userID, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// Validate quantity.
 	if math.IsNaN(input.Quantity) ||
 		math.IsInf(input.Quantity, 0) ||
@@ -359,17 +387,18 @@ func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWa
 	var createdAt time.Time
 
 	err = tx.QueryRow(ctx, `
-        INSERT INTO inventory_transactions (
-            product_id,
-            location_id,
-            transaction_type,
-            quantity,
-            reference,
-            notes
-        )
-        VALUES ($1, $2, 'WASTE', $3::numeric, $4, $5)
-        RETURNING id, created_at
-    `, productID, locationID, quantity, input.Reference, wasteNotes).
+    INSERT INTO inventory_transactions (
+        product_id,
+        location_id,
+        user_id,
+        transaction_type,
+        quantity,
+        reference,
+        notes
+    )
+    VALUES ($1, $2, $3, 'WASTE', $4::numeric, $5, $6)
+    RETURNING id, created_at
+`, productID, locationID, userID, quantity, input.Reference, input.Notes).
 		Scan(&transactionID, &createdAt)
 
 	if err != nil {
@@ -395,6 +424,11 @@ func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWa
 
 // ProcessProduction is the resolver for the processProduction field.
 func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.ProcessProductionInput) ([]*model.InventoryTransaction, error) {
+
+	userID, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// Validate both quantities.
 	validQuantity := func(q float64) bool {
 		return !math.IsNaN(q) &&
@@ -497,17 +531,18 @@ func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.Pr
 		var createdAt time.Time
 
 		err = tx.QueryRow(ctx, `
-            INSERT INTO inventory_transactions (
-                product_id,
-                location_id,
-                transaction_type,
-                quantity,
-                reference,
-                notes
-            )
-            VALUES ($1, $2, 'PRODUCTION', $3::numeric, $4, $5)
-            RETURNING id, created_at
-        `, movement.productID, locationID, quantityText, input.Reference, notes).
+			INSERT INTO inventory_transactions (
+				product_id,
+				location_id,
+				user_id,
+				transaction_type,
+				quantity,
+				reference,
+				notes
+			)
+			VALUES ($1, $2, $3, 'PRODUCTION', $4::numeric, $5, $6)
+			RETURNING id, created_at
+		`, movement.productID, locationID, userID, quantityText, input.Reference, notes).
 			Scan(&transactionID, &createdAt)
 
 		if err != nil {
@@ -535,6 +570,11 @@ func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.Pr
 
 // TransferInventory is the resolver for the transferInventory field.
 func (r *mutationResolver) TransferInventory(ctx context.Context, input model.TransferInventoryInput) (*model.InventoryTransaction, error) {
+
+	userID, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// 1. Validate the transfer quantity.
 	quantity := input.Quantity
 
@@ -614,23 +654,25 @@ func (r *mutationResolver) TransferInventory(ctx context.Context, input model.Tr
 	var createdAt time.Time
 
 	err = tx.QueryRow(ctx, `
-        INSERT INTO inventory_transactions (
-            product_id,
-            location_id,
-            from_location_id,
-            to_location_id,
-            transaction_type,
-            quantity,
-            reference,
-            notes
-        )
-        VALUES ($1, $2, $3, $4, 'TRANSFER', $5::numeric, $6, $7)
-        RETURNING id, created_at
-    `,
+    INSERT INTO inventory_transactions (
+        product_id,
+        location_id,
+        from_location_id,
+        to_location_id,
+        user_id,
+        transaction_type,
+        quantity,
+        reference,
+        notes
+    )
+    VALUES ($1, $2, $3, $4, $5, 'TRANSFER', $6::numeric, $7, $8)
+    RETURNING id, created_at
+`,
 		productID,
 		fromLocationID,
 		fromLocationID,
 		toLocationID,
+		userID,
 		quantityText,
 		input.Reference,
 		input.Notes,
