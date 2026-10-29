@@ -1,0 +1,82 @@
+import {
+  Boxes,
+  LayoutDashboard,
+  Package,
+  ArrowLeftRight,
+  MapPin,
+  LogOut,
+} from "lucide-react";
+
+export type Page = "dashboard" | "products";
+
+type SidebarProps = {
+  onLogout: () => void;
+  activePage: Page;
+  onNavigate: (page: Page) => void;
+};
+
+export default function Sidebar({
+  onLogout,
+  activePage,
+  onNavigate,
+}: SidebarProps) {
+  return (
+    <aside className="flex min-h-screen w-64 flex-col border-r border-slate-200 bg-white p-5">
+      <div className="mb-10 flex items-center gap-3">
+        <div className="rounded-xl bg-blue-600 p-2 text-white">
+          <Boxes size={24} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Numventory</h1>
+          <p className="text-xs text-slate-500">Inventory Management</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-2">
+        <button
+          type="button"
+          onClick={() => onNavigate("dashboard")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-medium ${
+            activePage === "dashboard"
+              ? "bg-blue-50 text-blue-700"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <LayoutDashboard size={19} />
+          Dashboard
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate("products")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-medium ${
+            activePage === "products"
+              ? "bg-blue-50 text-blue-700"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Package size={19} />
+          Products
+        </button>
+
+        <div className="flex items-center gap-3 px-4 py-3 text-slate-600">
+          <MapPin size={19} />
+          Locations
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3 text-slate-600">
+          <ArrowLeftRight size={19} />
+          Transactions
+        </div>
+      </nav>
+
+      <button
+        onClick={onLogout}
+        className="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"
+      >
+        <LogOut size={19} />
+        Log out
+      </button>
+    </aside>
+  );
+}
