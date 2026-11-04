@@ -7,7 +7,7 @@ import {
   LogOut,
 } from "lucide-react";
 
-export type Page = "dashboard" | "products";
+export type Page = "dashboard" | "products" | "locations" | "transactions";
 
 type SidebarProps = {
   onLogout: () => void;
@@ -59,15 +59,31 @@ export default function Sidebar({
           Products
         </button>
 
-        <div className="flex items-center gap-3 px-4 py-3 text-slate-600">
+        <button
+          type="button"
+          onClick={() => onNavigate("locations")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-medium ${
+            activePage === "locations"
+              ? "bg-blue-50 text-blue-700"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
           <MapPin size={19} />
           Locations
-        </div>
+        </button>
 
-        <div className="flex items-center gap-3 px-4 py-3 text-slate-600">
-          <ArrowLeftRight size={19} />
+        <button
+          type="button"
+          onClick={() => onNavigate("transactions")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "transactions"
+              ? "bg-blue-50 font-medium text-blue-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <ArrowLeftRight size={20} />
           Transactions
-        </div>
+        </button>
       </nav>
 
       <button

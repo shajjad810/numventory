@@ -238,22 +238,38 @@ export default function ProductsPage({
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
-                <th className="px-6 py-4 font-medium">Product ID</th>
+                <th className="px-6 py-4 font-medium">SKU</th>
                 <th className="px-6 py-4 font-medium">Product Name</th>
+                <th className="px-6 py-4 font-medium">Category</th>
                 <th className="px-6 py-4 font-medium">Unit</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {products.map((product) => (
-                <tr key={product.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 text-slate-500">{product.id}</td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {product.name}
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">{product.unit}</td>
-                </tr>
-              ))}
+              {products.map((product) => {
+                const category = categories.find(
+                  (c) => c.id === product.categoryId,
+                );
+
+                return (
+                  <tr key={product.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4 text-slate-600">{product.sku}</td>
+
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      {product.name}
+                    </td>
+
+                    <td className="px-6 py-4 text-slate-600">
+                      {category?.name ??
+                        (product.categoryId
+                          ? "Unknown category"
+                          : "No category")}
+                    </td>
+
+                    <td className="px-6 py-4 text-slate-600">{product.unit}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

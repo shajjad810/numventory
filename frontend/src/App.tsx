@@ -5,10 +5,13 @@ import {
   type InventoryItem,
   type Product,
   type Location,
+  type InventoryTransaction,
 } from "./lib/inventory";
 import { Package, MapPin, Boxes } from "lucide-react";
 import ProductsPage from "./components/ProductsPage";
 import Sidebar, { type Page } from "./components/Sidebar";
+import LocationsPage from "./components/LocationsPage";
+import TransactionsPage from "./components/TransactionsPage";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -22,6 +25,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [activePage, setActivePage] = useState<Page>("dashboard");
+  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -39,6 +43,7 @@ function App() {
           setInventory(data.inventory);
           setProducts(data.products);
           setLocations(data.locations);
+          setTransactions(data.inventoryTransactions);
         }
       } catch (err) {
         if (!cancelled) {
@@ -87,12 +92,26 @@ function App() {
         />
 
         <main className="min-w-0 flex-1 p-8">
-          {activePage === "products" ? (
+          {activePage === "transactions" ? (
+            <TransactionsPage
+              transactions={transactions}
+              products={products}
+              locations={locations}
+            />
+          ) : activePage === "products" ? (
             <ProductsPage
               products={products}
               token={token}
               onProductCreated={(product) => {
                 setProducts((current) => [...current, product]);
+              }}
+            />
+          ) : activePage === "locations" ? (
+            <LocationsPage
+              locations={locations}
+              token={token}
+              onLocationCreated={(location) => {
+                setLocations((current) => [...current, location]);
               }}
             />
           ) : (

@@ -7,6 +7,19 @@ export type InventoryItem = {
   locationId: string;
 };
 
+export type InventoryTransaction = {
+  id: string;
+  productId: string;
+  locationId: string;
+  transactionType: string;
+  quantity: number;
+  reference: string | null;
+  notes: string | null;
+  createdAt: string;
+  fromLocationId: string | null;
+  toLocationId: string | null;
+};
+
 export type Product = {
   id: string;
   sku: string;
@@ -19,6 +32,7 @@ export type Product = {
 export type Location = {
   id: string;
   name: string;
+  description?: string | null;
 };
 
 export type Category = {
@@ -30,6 +44,7 @@ export type InventoryData = {
   inventory: InventoryItem[];
   products: Product[];
   locations: Location[];
+  inventoryTransactions: InventoryTransaction[];
 };
 
 const INVENTORY_QUERY = `
@@ -51,6 +66,19 @@ const INVENTORY_QUERY = `
     locations {
       id
       name
+      description
+    }
+    inventoryTransactions {
+      id
+      productId
+      locationId
+      transactionType
+      quantity
+      reference
+      notes
+      createdAt
+      fromLocationId
+      toLocationId
     }
   }
 `;
@@ -118,4 +146,36 @@ export async function getCategories(token: string): Promise<Category[]> {
   );
 
   return data.categories;
+}
+
+export type CreateLocationInput = {
+  name: string;
+  description?: string;
+};
+
+type CreateLocationResponse = {
+  createLocation: Location;
+};
+
+const CREATE_LOCATION_MUTATION = `
+  mutation CreateLocation($input: CreateLocationInput!) {
+    createLocation(input: $input) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export async function createLocation(
+  input: CreateLocationInput,
+  token: string,
+): Promise<Location> {
+  const data = await graphqlRequest<CreateLocationResponse>(
+    CREATE_LOCATION_MUTATION,
+    { input },
+    token,
+  );
+
+  return data.createLocation;
 }
