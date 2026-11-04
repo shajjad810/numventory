@@ -17,6 +17,12 @@ export default function TransactionsPage({
   const [productFilter, setProductFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
+  function resetFilters() {
+    setTypeFilter("ALL");
+    setProductFilter("ALL");
+    setSearch("");
+  }
+
   const filteredTransactions = transactions.filter((transaction) => {
     const matchesType =
       typeFilter === "ALL" ||
@@ -31,6 +37,33 @@ export default function TransactionsPage({
 
     return matchesType && matchesProduct && matchesSearch;
   });
+  const transactionSummary = [
+    {
+      label: "Receiving",
+      type: "RECEIVING",
+      color: "text-green-600",
+    },
+    {
+      label: "Shipping",
+      type: "SHIPPING",
+      color: "text-blue-600",
+    },
+    {
+      label: "Waste",
+      type: "WASTE",
+      color: "text-red-600",
+    },
+    {
+      label: "Production",
+      type: "PRODUCTION",
+      color: "text-purple-600",
+    },
+    {
+      label: "Transfers",
+      type: "TRANSFER",
+      color: "text-slate-600",
+    },
+  ];
   function getProductName(productId: string) {
     return (
       products.find((product) => product.id === productId)?.name ??
@@ -171,6 +204,16 @@ export default function TransactionsPage({
               aria-label="Search transactions by reference"
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 sm:w-56"
             />
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={
+                typeFilter === "ALL" && productFilter === "ALL" && search === ""
+              }
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reset Filters
+            </button>
           </div>
         </div>
 
@@ -249,6 +292,27 @@ export default function TransactionsPage({
             </p>
           )}
         </div>
+      </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {transactionSummary.map((item) => {
+          const count = transactions.filter(
+            (transaction) =>
+              transaction.transactionType.toUpperCase() === item.type,
+          ).length;
+
+          return (
+            <div
+              key={item.type}
+              className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <p className="text-sm font-medium text-slate-500">{item.label}</p>
+
+              <h3 className={`mt-2 text-3xl font-bold ${item.color}`}>
+                {count}
+              </h3>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
