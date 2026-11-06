@@ -8,6 +8,7 @@ import {
   PackagePlus,
   Truck,
   Trash2,
+  Factory,
 } from "lucide-react";
 
 export type Page =
@@ -18,7 +19,8 @@ export type Page =
   | "receiving"
   | "shipping"
   | "waste"
-  | "transfer";
+  | "transfer"
+  | "production";
 
 type SidebarProps = {
   onLogout: () => void;
@@ -142,6 +144,30 @@ export default function Sidebar({
         >
           <ArrowLeftRight size={20} />
           Transfer Inventory
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("production")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "production"
+              ? "bg-blue-50 font-medium text-blue-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Factory size={20} />
+          Production
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("production")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "production"
+              ? "bg-blue-50 font-medium text-blue-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Factory size={20} />
+          Production Inventory
         </button>
       </nav>
 

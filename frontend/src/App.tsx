@@ -16,6 +16,7 @@ import ReceiveInventoryPage from "./components/ReceiveInventoryPage";
 import ShipInventoryPage from "./components/ShipInventoryPage";
 import RecordWastePage from "./components/RecordWastePage";
 import TransferInventoryPage from "./components/TransferInventoryPage";
+import ProductionPage from "./components/ProductionPage";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -118,7 +119,17 @@ function App() {
         />
 
         <main className="min-w-0 flex-1 p-8">
-          {activePage === "transfer" ? (
+          {activePage === "production" ? (
+            <ProductionPage
+              products={products}
+              locations={locations}
+              inventory={inventory}
+              token={token}
+              onProduced={() => {
+                void refreshInventory();
+              }}
+            />
+          ) : activePage === "transfer" ? (
             <TransferInventoryPage
               products={products}
               locations={locations}
