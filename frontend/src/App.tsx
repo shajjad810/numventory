@@ -12,6 +12,10 @@ import ProductsPage from "./components/ProductsPage";
 import Sidebar, { type Page } from "./components/Sidebar";
 import LocationsPage from "./components/LocationsPage";
 import TransactionsPage from "./components/TransactionsPage";
+import ReceiveInventoryPage from "./components/ReceiveInventoryPage";
+import ShipInventoryPage from "./components/ShipInventoryPage";
+import RecordWastePage from "./components/RecordWastePage";
+import TransferInventoryPage from "./components/TransferInventoryPage";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -63,6 +67,28 @@ function App() {
     };
   }, [token]);
 
+  async function refreshInventory() {
+    if (!token) return;
+
+    setInventoryLoading(true);
+    setInventoryError("");
+
+    try {
+      const data = await getInventory(token);
+
+      setInventory(data.inventory);
+      setProducts(data.products);
+      setLocations(data.locations);
+      setTransactions(data.inventoryTransactions);
+    } catch (err) {
+      setInventoryError(
+        err instanceof Error ? err.message : "Failed to refresh inventory",
+      );
+    } finally {
+      setInventoryLoading(false);
+    }
+  }
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -92,7 +118,46 @@ function App() {
         />
 
         <main className="min-w-0 flex-1 p-8">
-          {activePage === "transactions" ? (
+          {activePage === "transfer" ? (
+            <TransferInventoryPage
+              products={products}
+              locations={locations}
+              inventory={inventory}
+              token={token}
+              onTransferred={() => {
+                void refreshInventory();
+              }}
+            />
+          ) : activePage === "waste" ? (
+            <RecordWastePage
+              products={products}
+              locations={locations}
+              inventory={inventory}
+              token={token}
+              onWasteRecorded={() => {
+                void refreshInventory();
+              }}
+            />
+          ) : activePage === "shipping" ? (
+            <ShipInventoryPage
+              products={products}
+              locations={locations}
+              inventory={inventory}
+              token={token}
+              onShipped={() => {
+                void refreshInventory();
+              }}
+            />
+          ) : activePage === "receiving" ? (
+            <ReceiveInventoryPage
+              products={products}
+              locations={locations}
+              token={token}
+              onReceived={() => {
+                void refreshInventory();
+              }}
+            />
+          ) : activePage === "transactions" ? (
             <TransactionsPage
               transactions={transactions}
               products={products}

@@ -179,3 +179,217 @@ export async function createLocation(
 
   return data.createLocation;
 }
+
+export type ReceiveInventoryInput = {
+  productId: string;
+  locationId: string;
+  quantity: number;
+  reference?: string;
+  notes?: string;
+};
+
+type ReceiveInventoryResponse = {
+  receiveInventory: InventoryTransaction;
+};
+
+const RECEIVE_INVENTORY_MUTATION = `
+  mutation ReceiveInventory($input: ReceiveInventoryInput!) {
+    receiveInventory(input: $input) {
+      id
+      productId
+      locationId
+      transactionType
+      quantity
+      reference
+      notes
+      createdAt
+      fromLocationId
+      toLocationId
+    }
+  }
+`;
+
+export async function receiveInventory(
+  input: ReceiveInventoryInput,
+  token: string,
+): Promise<InventoryTransaction> {
+  const data = await graphqlRequest<ReceiveInventoryResponse>(
+    RECEIVE_INVENTORY_MUTATION,
+    { input },
+    token,
+  );
+
+  return data.receiveInventory;
+}
+
+export type ShipInventoryInput = {
+  productId: string;
+  locationId: string;
+  quantity: number;
+  reference?: string;
+  notes?: string;
+};
+
+type ShipInventoryResponse = {
+  shipInventory: InventoryTransaction;
+};
+
+const SHIP_INVENTORY_MUTATION = `
+  mutation ShipInventory($input: ShipInventoryInput!) {
+    shipInventory(input: $input) {
+      id
+      productId
+      locationId
+      transactionType
+      quantity
+      reference
+      notes
+      createdAt
+      fromLocationId
+      toLocationId
+    }
+  }
+`;
+
+export async function shipInventory(
+  input: ShipInventoryInput,
+  token: string,
+): Promise<InventoryTransaction> {
+  const data = await graphqlRequest<ShipInventoryResponse>(
+    SHIP_INVENTORY_MUTATION,
+    { input },
+    token,
+  );
+
+  return data.shipInventory;
+}
+
+export type RecordWasteInput = {
+  productId: string;
+  locationId: string;
+  quantity: number;
+  reason: string;
+  reference?: string;
+  notes?: string;
+};
+
+type RecordWasteResponse = {
+  recordWaste: InventoryTransaction;
+};
+
+const RECORD_WASTE_MUTATION = `
+  mutation RecordWaste($input: RecordWasteInput!) {
+    recordWaste(input: $input) {
+      id
+      productId
+      locationId
+      transactionType
+      quantity
+      reference
+      notes
+      createdAt
+      fromLocationId
+      toLocationId
+    }
+  }
+`;
+
+export async function recordWaste(
+  input: RecordWasteInput,
+  token: string,
+): Promise<InventoryTransaction> {
+  const data = await graphqlRequest<RecordWasteResponse>(
+    RECORD_WASTE_MUTATION,
+    { input },
+    token,
+  );
+
+  return data.recordWaste;
+}
+
+export type TransferInventoryInput = {
+  productId: string;
+  fromLocationId: string;
+  toLocationId: string;
+  quantity: number;
+  reference?: string;
+  notes?: string;
+};
+
+type TransferInventoryResponse = {
+  transferInventory: InventoryTransaction;
+};
+
+const TRANSFER_INVENTORY_MUTATION = `
+  mutation TransferInventory($input: TransferInventoryInput!) {
+    transferInventory(input: $input) {
+      id
+      productId
+      locationId
+      transactionType
+      quantity
+      reference
+      notes
+      createdAt
+      fromLocationId
+      toLocationId
+    }
+  }
+`;
+
+export async function transferInventory(
+  input: TransferInventoryInput,
+  token: string,
+): Promise<InventoryTransaction> {
+  const data = await graphqlRequest<TransferInventoryResponse>(
+    TRANSFER_INVENTORY_MUTATION,
+    { input },
+    token,
+  );
+
+  return data.transferInventory;
+}
+
+export type ProcessProductionInput = {
+  rawProductId: string;
+  finishedProductId: string;
+  locationId: string;
+  rawQuantity: number;
+  finishedQuantity: number;
+  reference?: string;
+  notes?: string;
+};
+
+type ProcessProductionResponse = {
+  processProduction: InventoryTransaction[];
+};
+
+const PROCESS_PRODUCTION_MUTATION = `
+  mutation ProcessProduction($input: ProcessProductionInput!) {
+    processProduction(input: $input) {
+      id
+      productId
+      locationId
+      transactionType
+      quantity
+      reference
+      notes
+      createdAt
+      fromLocationId
+      toLocationId
+    }
+  }
+`;
+
+export async function processProduction(
+  input: ProcessProductionInput,
+  token: string,
+): Promise<InventoryTransaction[]> {
+  const data = await graphqlRequest<ProcessProductionResponse>(
+    PROCESS_PRODUCTION_MUTATION,
+    { input },
+    token,
+  );
+
+  return data.processProduction;
+}

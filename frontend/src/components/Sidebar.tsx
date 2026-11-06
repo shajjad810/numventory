@@ -5,9 +5,20 @@ import {
   ArrowLeftRight,
   MapPin,
   LogOut,
+  PackagePlus,
+  Truck,
+  Trash2,
 } from "lucide-react";
 
-export type Page = "dashboard" | "products" | "locations" | "transactions";
+export type Page =
+  | "dashboard"
+  | "products"
+  | "locations"
+  | "transactions"
+  | "receiving"
+  | "shipping"
+  | "waste"
+  | "transfer";
 
 type SidebarProps = {
   onLogout: () => void;
@@ -83,6 +94,54 @@ export default function Sidebar({
         >
           <ArrowLeftRight size={20} />
           Transactions
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("receiving")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "receiving"
+              ? "bg-blue-50 font-medium text-blue-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <PackagePlus size={20} />
+          Receive Inventory
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("shipping")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "shipping"
+              ? "bg-blue-50 font-medium text-blue-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Truck size={20} />
+          Ship Inventory
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("waste")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "waste"
+              ? "bg-red-50 font-medium text-red-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Trash2 size={20} />
+          Record Waste
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("transfer")}
+          className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left ${
+            activePage === "transfer"
+              ? "bg-blue-50 font-medium text-blue-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <ArrowLeftRight size={20} />
+          Transfer Inventory
         </button>
       </nav>
 
