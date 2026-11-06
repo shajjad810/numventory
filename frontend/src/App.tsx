@@ -7,7 +7,6 @@ import {
   type Location,
   type InventoryTransaction,
 } from "./lib/inventory";
-import { Package, MapPin, Boxes } from "lucide-react";
 import ProductsPage from "./components/ProductsPage";
 import Sidebar, { type Page } from "./components/Sidebar";
 import LocationsPage from "./components/LocationsPage";
@@ -17,6 +16,7 @@ import ShipInventoryPage from "./components/ShipInventoryPage";
 import RecordWastePage from "./components/RecordWastePage";
 import TransferInventoryPage from "./components/TransferInventoryPage";
 import ProductionPage from "./components/ProductionPage";
+import DashboardPage from "./components/DashboardPage";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -192,13 +192,6 @@ function App() {
             />
           ) : (
             <>
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-                <p className="mt-2 text-slate-500">
-                  Welcome to your inventory overview.
-                </p>
-              </div>
-
               {inventoryLoading && (
                 <p className="text-slate-500">Loading inventory...</p>
               )}
@@ -210,84 +203,12 @@ function App() {
               )}
 
               {!inventoryLoading && !inventoryError && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                      <Package className="mb-4 text-blue-600" size={24} />
-                      <p className="text-sm text-slate-500">Total Products</p>
-                      <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                        {products.length}
-                      </h2>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                      <MapPin className="mb-4 text-emerald-600" size={24} />
-                      <p className="text-sm text-slate-500">Locations</p>
-                      <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                        {locations.length}
-                      </h2>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                      <Boxes className="mb-4 text-violet-600" size={24} />
-                      <p className="text-sm text-slate-500">
-                        Inventory Records
-                      </p>
-                      <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                        {inventory.length}
-                      </h2>
-                    </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-6 py-5">
-                      <h2 className="text-lg font-semibold text-slate-900">
-                        Inventory Overview
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Current stock across all locations
-                      </p>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-600">
-                          <tr>
-                            <th className="px-6 py-4 font-medium">Product</th>
-                            <th className="px-6 py-4 font-medium">Location</th>
-                            <th className="px-6 py-4 font-medium">Quantity</th>
-                          </tr>
-                        </thead>
-
-                        <tbody className="divide-y divide-slate-100">
-                          {inventory.map((item) => {
-                            const product = products.find(
-                              (p) => p.id === item.productId,
-                            );
-
-                            const location = locations.find(
-                              (l) => l.id === item.locationId,
-                            );
-
-                            return (
-                              <tr key={item.id} className="hover:bg-slate-50">
-                                <td className="px-6 py-4 font-medium text-slate-900">
-                                  {product?.name ?? "Unknown Product"}
-                                </td>
-                                <td className="px-6 py-4 text-slate-600">
-                                  {location?.name ?? "Unknown Location"}
-                                </td>
-                                <td className="px-6 py-4 text-slate-700">
-                                  {item.quantity} {product?.unit ?? ""}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
+                <DashboardPage
+                  products={products}
+                  locations={locations}
+                  inventory={inventory}
+                  transactions={transactions}
+                />
               )}
             </>
           )}
