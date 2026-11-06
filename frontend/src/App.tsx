@@ -181,6 +181,13 @@ function App() {
               onProductCreated={(product) => {
                 setProducts((current) => [...current, product]);
               }}
+              onProductUpdated={(updatedProduct) => {
+                setProducts((current) =>
+                  current.map((product) =>
+                    product.id === updatedProduct.id ? updatedProduct : product,
+                  ),
+                );
+              }}
             />
           ) : activePage === "locations" ? (
             <LocationsPage

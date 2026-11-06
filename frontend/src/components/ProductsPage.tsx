@@ -3,6 +3,7 @@ import { Package, Plus, X } from "lucide-react";
 import {
   createProduct,
   getCategories,
+  updateProductThreshold,
   type Product,
   type Category,
   type CreateProductInput,
@@ -12,24 +13,31 @@ type ProductsPageProps = {
   products: Product[];
   token: string;
   onProductCreated: (product: Product) => void;
+  onProductUpdated: (product: Product) => void;
 };
 
 export default function ProductsPage({
   products,
   token,
   onProductCreated,
+  onProductUpdated,
 }: ProductsPageProps) {
   const [showForm, setShowForm] = useState(false);
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [unit, setUnit] = useState("KG");
+  const [lowStockThreshold, setLowStockThreshold] = useState("5");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState("");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editThreshold, setEditThreshold] = useState("");
+  const [updatingThreshold, setUpdatingThreshold] = useState(false);
+  const [thresholdError, setThresholdError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +71,7 @@ export default function ProductsPage({
       sku: sku.trim(),
       name: name.trim(),
       unit: unit.trim(),
+      lowStockThreshold: Number(lowStockThreshold),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(categoryId ? { categoryId } : {}),
     };
@@ -75,11 +84,50 @@ export default function ProductsPage({
       setName("");
       setDescription("");
       setUnit("KG");
+      setLowStockThreshold("5");
+      setCategoryId("");
       setShowForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create product");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleUpdateThreshold(productId: string) {
+    setThresholdError("");
+
+    const threshold = Number(editThreshold);
+
+    if (
+      editThreshold.trim() === "" ||
+      !Number.isFinite(threshold) ||
+      threshold < 0 ||
+      threshold > 9999999999.99 ||
+      Math.abs(threshold * 100 - Math.round(threshold * 100)) > 1e-7
+    ) {
+      setThresholdError("Enter a valid threshold with up to 2 decimal places.");
+      return;
+    }
+
+    setUpdatingThreshold(true);
+
+    try {
+      const updatedProduct = await updateProductThreshold(
+        productId,
+        threshold,
+        token,
+      );
+
+      onProductUpdated(updatedProduct);
+      setEditingProductId(null);
+      setEditThreshold("");
+    } catch (err) {
+      setThresholdError(
+        err instanceof Error ? err.message : "Failed to update threshold",
+      );
+    } finally {
+      setUpdatingThreshold(false);
     }
   }
 
@@ -192,6 +240,32 @@ export default function ProductsPage({
                 placeholder="KG"
               />
             </div>
+            <div>
+              <label
+                htmlFor="low-stock-threshold"
+                className="mb-1 block text-sm font-medium"
+              >
+                Low Stock Threshold *
+              </label>
+
+              <input
+                id="low-stock-threshold"
+                type="number"
+                min="0"
+                max="9999999999.99"
+                step="0.01"
+                value={lowStockThreshold}
+                onChange={(e) => setLowStockThreshold(e.target.value)}
+                required
+                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="5"
+              />
+
+              <p className="mt-1 text-xs text-slate-500">
+                Show a low-stock alert when inventory reaches this quantity or
+                less.
+              </p>
+            </div>
 
             <div>
               <label
@@ -242,6 +316,8 @@ export default function ProductsPage({
                 <th className="px-6 py-4 font-medium">Product Name</th>
                 <th className="px-6 py-4 font-medium">Category</th>
                 <th className="px-6 py-4 font-medium">Unit</th>
+                <th className="px-6 py-4 font-medium">Low Stock Threshold</th>
+                <th className="px-6 py-4 font-medium">Actions</th>
               </tr>
             </thead>
 
@@ -267,6 +343,74 @@ export default function ProductsPage({
                     </td>
 
                     <td className="px-6 py-4 text-slate-600">{product.unit}</td>
+
+                    <td className="px-6 py-4 text-slate-600">
+                      {editingProductId === product.id ? (
+                        <input
+                          type="number"
+                          min="0"
+                          max="9999999999.99"
+                          step="0.01"
+                          value={editThreshold}
+                          onChange={(e) => setEditThreshold(e.target.value)}
+                          disabled={updatingThreshold}
+                          aria-label={`Low stock threshold for ${product.name}`}
+                          className="w-28 rounded-lg border border-slate-300 px-3 py-2"
+                        />
+                      ) : (
+                        <span>
+                          {product.lowStockThreshold} {product.unit}
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      {editingProductId === product.id ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleUpdateThreshold(product.id)
+                            }
+                            disabled={updatingThreshold}
+                            className="rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {updatingThreshold ? "Saving..." : "Save"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingProductId(null);
+                              setEditThreshold("");
+                              setThresholdError("");
+                            }}
+                            disabled={updatingThreshold}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProductId(product.id);
+                            setEditThreshold(String(product.lowStockThreshold));
+                            setThresholdError("");
+                          }}
+                          className="rounded-lg border border-blue-200 px-3 py-2 text-blue-600 hover:bg-blue-50"
+                        >
+                          Edit
+                        </button>
+                      )}
+
+                      {editingProductId === product.id && thresholdError && (
+                        <p role="alert" className="mt-2 text-sm text-red-600">
+                          {thresholdError}
+                        </p>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

@@ -25,8 +25,6 @@ export default function DashboardPage({
   inventory,
   transactions,
 }: DashboardPageProps) {
-  const LOW_STOCK_THRESHOLD = 5;
-
   const stockByUnit = inventory.reduce<Record<string, number>>(
     (totals, item) => {
       const product = products.find((p) => p.id === item.productId);
@@ -37,9 +35,13 @@ export default function DashboardPage({
     {},
   );
 
-  const lowStockItems = inventory.filter(
-    (item) => item.quantity <= LOW_STOCK_THRESHOLD,
-  );
+  const lowStockItems = inventory.filter((item) => {
+    const product = products.find((p) => p.id === item.productId);
+
+    if (!product) return false;
+
+    return item.quantity <= product.lowStockThreshold;
+  });
 
   const recentTransactions = [...transactions]
     .sort(
@@ -137,7 +139,7 @@ export default function DashboardPage({
         </div>
 
         <p className="mt-1 text-sm text-slate-500">
-          Inventory records with 5 units or less.
+          Inventory records at or below their product's low-stock threshold.
         </p>
 
         {lowStockItems.length === 0 ? (

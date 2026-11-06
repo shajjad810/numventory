@@ -27,6 +27,7 @@ export type Product = {
   description?: string | null;
   categoryId?: string | null;
   unit: string;
+  lowStockThreshold: number;
 };
 
 export type Location = {
@@ -62,6 +63,7 @@ const INVENTORY_QUERY = `
       description
       categoryId
       unit
+      lowStockThreshold
     }
     locations {
       id
@@ -93,6 +95,7 @@ export type CreateProductInput = {
   description?: string;
   categoryId?: string;
   unit: string;
+  lowStockThreshold?: number;
 };
 
 type CreateProductResponse = {
@@ -108,6 +111,7 @@ const CREATE_PRODUCT_MUTATION = `
       description
       categoryId
       unit
+      lowStockThreshold
     }
   }
 `;
@@ -392,4 +396,41 @@ export async function processProduction(
   );
 
   return data.processProduction;
+}
+
+type UpdateProductThresholdResponse = {
+  updateProductThreshold: Product;
+};
+
+const UPDATE_PRODUCT_THRESHOLD_MUTATION = `
+  mutation UpdateProductThreshold($input: UpdateProductThresholdInput!) {
+    updateProductThreshold(input: $input) {
+      id
+      sku
+      name
+      description
+      categoryId
+      unit
+      lowStockThreshold
+    }
+  }
+`;
+
+export async function updateProductThreshold(
+  productId: string,
+  lowStockThreshold: number,
+  token: string,
+): Promise<Product> {
+  const data = await graphqlRequest<UpdateProductThresholdResponse>(
+    UPDATE_PRODUCT_THRESHOLD_MUTATION,
+    {
+      input: {
+        productId,
+        lowStockThreshold,
+      },
+    },
+    token,
+  );
+
+  return data.updateProductThreshold;
 }

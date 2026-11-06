@@ -10,6 +10,7 @@ type Product {
   description: String
   categoryId: ID
   unit: String!
+  lowStockThreshold: Float!
 }
 
 type Location {
@@ -60,11 +61,17 @@ input CreateProductInput {
   description: String
   categoryId: ID
   unit: String!
+  lowStockThreshold: Float
 }
 
 input CreateLocationInput {
   name: String!
   description: String
+}
+
+input UpdateProductThresholdInput {
+  productId: ID!
+  lowStockThreshold: Float!
 }
 
 type Mutation {
@@ -78,6 +85,7 @@ type Mutation {
   transferInventory(input: TransferInventoryInput!): InventoryTransaction!
   registerUser(input: RegisterUserInput!): User!
   login(input: LoginInput!): AuthPayload!
+  updateProductThreshold(input: UpdateProductThresholdInput!): Product!
 }
 
 type Inventory {

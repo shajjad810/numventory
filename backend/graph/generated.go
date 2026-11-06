@@ -73,25 +73,27 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateCategory    func(childComplexity int, input model.CreateCategoryInput) int
-		CreateLocation    func(childComplexity int, input model.CreateLocationInput) int
-		CreateProduct     func(childComplexity int, input model.CreateProductInput) int
-		Login             func(childComplexity int, input model.LoginInput) int
-		ProcessProduction func(childComplexity int, input model.ProcessProductionInput) int
-		ReceiveInventory  func(childComplexity int, input model.ReceiveInventoryInput) int
-		RecordWaste       func(childComplexity int, input model.RecordWasteInput) int
-		RegisterUser      func(childComplexity int, input model.RegisterUserInput) int
-		ShipInventory     func(childComplexity int, input model.ShipInventoryInput) int
-		TransferInventory func(childComplexity int, input model.TransferInventoryInput) int
+		CreateCategory         func(childComplexity int, input model.CreateCategoryInput) int
+		CreateLocation         func(childComplexity int, input model.CreateLocationInput) int
+		CreateProduct          func(childComplexity int, input model.CreateProductInput) int
+		Login                  func(childComplexity int, input model.LoginInput) int
+		ProcessProduction      func(childComplexity int, input model.ProcessProductionInput) int
+		ReceiveInventory       func(childComplexity int, input model.ReceiveInventoryInput) int
+		RecordWaste            func(childComplexity int, input model.RecordWasteInput) int
+		RegisterUser           func(childComplexity int, input model.RegisterUserInput) int
+		ShipInventory          func(childComplexity int, input model.ShipInventoryInput) int
+		TransferInventory      func(childComplexity int, input model.TransferInventoryInput) int
+		UpdateProductThreshold func(childComplexity int, input model.UpdateProductThresholdInput) int
 	}
 
 	Product struct {
-		CategoryID  func(childComplexity int) int
-		Description func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Name        func(childComplexity int) int
-		Sku         func(childComplexity int) int
-		Unit        func(childComplexity int) int
+		CategoryID        func(childComplexity int) int
+		Description       func(childComplexity int) int
+		ID                func(childComplexity int) int
+		LowStockThreshold func(childComplexity int) int
+		Name              func(childComplexity int) int
+		Sku               func(childComplexity int) int
+		Unit              func(childComplexity int) int
 	}
 
 	Query struct {
@@ -125,6 +127,7 @@ type MutationResolver interface {
 	TransferInventory(ctx context.Context, input model.TransferInventoryInput) (*model.InventoryTransaction, error)
 	RegisterUser(ctx context.Context, input model.RegisterUserInput) (*model.User, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
+	UpdateProductThreshold(ctx context.Context, input model.UpdateProductThresholdInput) (*model.Product, error)
 }
 type QueryResolver interface {
 	Categories(ctx context.Context) ([]*model.Category, error)
@@ -393,6 +396,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.TransferInventory(childComplexity, args["input"].(model.TransferInventoryInput)), true
+	case "Mutation.updateProductThreshold":
+		if e.ComplexityRoot.Mutation.UpdateProductThreshold == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateProductThreshold_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateProductThreshold(childComplexity, args["input"].(model.UpdateProductThresholdInput)), true
 
 	case "Product.categoryId":
 		if e.ComplexityRoot.Product.CategoryID == nil {
@@ -412,6 +426,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.ID(childComplexity), true
+	case "Product.lowStockThreshold":
+		if e.ComplexityRoot.Product.LowStockThreshold == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.LowStockThreshold(childComplexity), true
 	case "Product.name":
 		if e.ComplexityRoot.Product.Name == nil {
 			break
@@ -507,6 +527,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("RegisterUserInput", ec.unmarshalInputRegisterUserInput),
 			graphql.NewInputUnmarshaler("ShipInventoryInput", ec.unmarshalInputShipInventoryInput),
 			graphql.NewInputUnmarshaler("TransferInventoryInput", ec.unmarshalInputTransferInventoryInput),
+			graphql.NewInputUnmarshaler("UpdateProductThresholdInput", ec.unmarshalInputUpdateProductThresholdInput),
 		)
 	}
 	first := true
@@ -688,6 +709,8 @@ func (ec *executionContext) childFields_Product(ctx context.Context, field graph
 		return ec.fieldContext_Product_categoryId(ctx, field)
 	case "unit":
 		return ec.fieldContext_Product_unit(ctx, field)
+	case "lowStockThreshold":
+		return ec.fieldContext_Product_lowStockThreshold(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
 }
@@ -954,6 +977,20 @@ func (ec *executionContext) field_Mutation_transferInventory_args(ctx context.Co
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.TransferInventoryInput, error) {
 			return ec.unmarshalNTransferInventoryInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐTransferInventoryInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateProductThreshold_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UpdateProductThresholdInput, error) {
+			return ec.unmarshalNUpdateProductThresholdInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐUpdateProductThresholdInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -1982,6 +2019,50 @@ func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_updateProductThreshold(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateProductThreshold(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateProductThreshold(ctx, fc.Args["input"].(model.UpdateProductThresholdInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Product) graphql.Marshaler {
+			return ec.marshalNProduct2ᚖgithubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐProduct(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateProductThreshold(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Product(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateProductThreshold_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_id(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2118,6 +2199,29 @@ func (ec *executionContext) _Product_unit(ctx context.Context, field graphql.Col
 }
 func (ec *executionContext) fieldContext_Product_unit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Product", field, false, false, "String")
+}
+
+func (ec *executionContext) _Product_lowStockThreshold(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Product_lowStockThreshold(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LowStockThreshold, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Product_lowStockThreshold(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Product", field, false, false, "Float")
 }
 
 func (ec *executionContext) _Query_categories(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3623,7 +3727,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"sku", "name", "description", "categoryId", "unit"}
+	fieldsInOrder := [...]string{"sku", "name", "description", "categoryId", "unit", "lowStockThreshold"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -3665,6 +3769,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Unit = data
+		case "lowStockThreshold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lowStockThreshold"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LowStockThreshold = data
 		}
 	}
 	return it, nil
@@ -4165,6 +4276,55 @@ func UnmarshalTransferInventoryInput(ctx context.Context, raw any) (model.Transf
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputUpdateProductThresholdInput(ctx context.Context, obj any) (model.UpdateProductThresholdInput, error) {
+	var it model.UpdateProductThresholdInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"productId", "lowStockThreshold"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProductID = data
+		case "lowStockThreshold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lowStockThreshold"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LowStockThreshold = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalUpdateProductThresholdInput unmarshals raw into the UpdateProductThresholdInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalUpdateProductThresholdInput(ctx context.Context, raw any) (model.UpdateProductThresholdInput, error) {
+	var out model.UpdateProductThresholdInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "UpdateProductThresholdInput", raw, &out)
+	return out, err
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -4507,6 +4667,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateProductThreshold":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateProductThreshold(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4562,6 +4729,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "unit":
 			out.Values[i] = ec._Product_unit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lowStockThreshold":
+			out.Values[i] = ec._Product_lowStockThreshold(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -5306,6 +5478,11 @@ func (ec *executionContext) unmarshalNTransferInventoryInput2githubᚗcomᚋshaj
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNUpdateProductThresholdInput2githubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐUpdateProductThresholdInput(ctx context.Context, v any) (model.UpdateProductThresholdInput, error) {
+	res, err := ec.unmarshalInputUpdateProductThresholdInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋshajjadhossenᚋnumventoryᚋbackendᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
 	if v == nil {
 		graphql.AddInvalidNullError(ctx, "User!")
@@ -5484,6 +5661,23 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {

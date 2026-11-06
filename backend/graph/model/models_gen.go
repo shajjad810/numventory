@@ -22,11 +22,12 @@ type CreateLocationInput struct {
 }
 
 type CreateProductInput struct {
-	Sku         string  `json:"sku"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	CategoryID  *string `json:"categoryId,omitempty"`
-	Unit        string  `json:"unit"`
+	Sku               string   `json:"sku"`
+	Name              string   `json:"name"`
+	Description       *string  `json:"description,omitempty"`
+	CategoryID        *string  `json:"categoryId,omitempty"`
+	Unit              string   `json:"unit"`
+	LowStockThreshold *float64 `json:"lowStockThreshold,omitempty"`
 }
 
 type Inventory struct {
@@ -74,12 +75,13 @@ type ProcessProductionInput struct {
 }
 
 type Product struct {
-	ID          string  `json:"id"`
-	Sku         string  `json:"sku"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	CategoryID  *string `json:"categoryId,omitempty"`
-	Unit        string  `json:"unit"`
+	ID                string  `json:"id"`
+	Sku               string  `json:"sku"`
+	Name              string  `json:"name"`
+	Description       *string `json:"description,omitempty"`
+	CategoryID        *string `json:"categoryId,omitempty"`
+	Unit              string  `json:"unit"`
+	LowStockThreshold float64 `json:"lowStockThreshold"`
 }
 
 type Query struct {
@@ -123,6 +125,11 @@ type TransferInventoryInput struct {
 	Quantity       float64 `json:"quantity"`
 	Reference      *string `json:"reference,omitempty"`
 	Notes          *string `json:"notes,omitempty"`
+}
+
+type UpdateProductThresholdInput struct {
+	ProductID         string  `json:"productId"`
+	LowStockThreshold float64 `json:"lowStockThreshold"`
 }
 
 type User struct {

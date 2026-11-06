@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	jwt "github.com/golang-jwt/jwt/v5"
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shajjadhossen/numventory/backend/graph/model"
@@ -53,32 +53,47 @@ func (r *mutationResolver) CreateCategory(ctx context.Context, input model.Creat
 
 // CreateProduct is the resolver for the createProduct field.
 func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
-
 	_, err := auth.RequireUser(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var id int64
 
 	var categoryID *int64
 	if input.CategoryID != nil {
 		parsedID, err := strconv.ParseInt(*input.CategoryID, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid category ID: %w", err)
+		if err != nil || parsedID <= 0 {
+			return nil, fmt.Errorf("invalid category ID")
 		}
 		categoryID = &parsedID
 	}
 
+	threshold := 5.0
+	if input.LowStockThreshold != nil {
+		threshold = *input.LowStockThreshold
+	}
+
+	if math.IsNaN(threshold) ||
+		math.IsInf(threshold, 0) ||
+		threshold < 0 ||
+		threshold > 9999999999.99 ||
+		math.Abs(threshold*100-math.Round(threshold*100)) > 1e-7 {
+		return nil, fmt.Errorf("low stock threshold must be non-negative and have at most two decimal places")
+	}
+
+	var id int64
+
 	err = r.DB.QueryRow(
 		ctx,
-		`INSERT INTO products (sku, name, description, category_id, unit)
-         VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO products
+            (sku, name, description, category_id, unit, low_stock_threshold)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
 		input.Sku,
 		input.Name,
 		input.Description,
 		categoryID,
 		input.Unit,
+		threshold,
 	).Scan(&id)
 
 	if err != nil {
@@ -86,12 +101,13 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 	}
 
 	return &model.Product{
-		ID:          strconv.FormatInt(id, 10),
-		Sku:         input.Sku,
-		Name:        input.Name,
-		Description: input.Description,
-		CategoryID:  input.CategoryID,
-		Unit:        input.Unit,
+		ID:                strconv.FormatInt(id, 10),
+		Sku:               input.Sku,
+		Name:              input.Name,
+		Description:       input.Description,
+		CategoryID:        input.CategoryID,
+		Unit:              input.Unit,
+		LowStockThreshold: threshold,
 	}, nil
 }
 
@@ -127,7 +143,6 @@ func (r *mutationResolver) CreateLocation(ctx context.Context, input model.Creat
 
 // ReceiveInventory is the resolver for the receiveInventory field.
 func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.ReceiveInventoryInput) (*model.InventoryTransaction, error) {
-
 	userID, err := auth.RequireUser(ctx)
 	if err != nil {
 		return nil, err
@@ -217,7 +232,6 @@ func (r *mutationResolver) ReceiveInventory(ctx context.Context, input model.Rec
 
 // ShipInventory is the resolver for the shipInventory field.
 func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipInventoryInput) (*model.InventoryTransaction, error) {
-
 	userID, err := auth.RequireUser(ctx)
 	if err != nil {
 		return nil, err
@@ -316,7 +330,6 @@ func (r *mutationResolver) ShipInventory(ctx context.Context, input model.ShipIn
 
 // RecordWaste is the resolver for the recordWaste field.
 func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWasteInput) (*model.InventoryTransaction, error) {
-
 	userID, err := auth.RequireUser(ctx)
 	if err != nil {
 		return nil, err
@@ -424,7 +437,6 @@ func (r *mutationResolver) RecordWaste(ctx context.Context, input model.RecordWa
 
 // ProcessProduction is the resolver for the processProduction field.
 func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.ProcessProductionInput) ([]*model.InventoryTransaction, error) {
-
 	userID, err := auth.RequireUser(ctx)
 	if err != nil {
 		return nil, err
@@ -570,7 +582,6 @@ func (r *mutationResolver) ProcessProduction(ctx context.Context, input model.Pr
 
 // TransferInventory is the resolver for the transferInventory field.
 func (r *mutationResolver) TransferInventory(ctx context.Context, input model.TransferInventoryInput) (*model.InventoryTransaction, error) {
-
 	userID, err := auth.RequireUser(ctx)
 	if err != nil {
 		return nil, err
@@ -829,6 +840,78 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	}, nil
 }
 
+// UpdateProductThreshold is the resolver for the updateProductThreshold field.
+func (r *mutationResolver) UpdateProductThreshold(ctx context.Context, input model.UpdateProductThresholdInput) (*model.Product, error) {
+	_, err := auth.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	productID, err := strconv.ParseInt(input.ProductID, 10, 64)
+	if err != nil || productID <= 0 {
+		return nil, fmt.Errorf("invalid product ID")
+	}
+
+	threshold := input.LowStockThreshold
+
+	if math.IsNaN(threshold) ||
+		math.IsInf(threshold, 0) ||
+		threshold < 0 ||
+		threshold > 9999999999.99 ||
+		math.Abs(threshold*100-math.Round(threshold*100)) > 1e-7 {
+		return nil, fmt.Errorf("low stock threshold must be non-negative and have at most two decimal places")
+	}
+
+	var id int64
+	var sku, name, unit string
+	var description *string
+	var categoryID *int64
+	var updatedThreshold float64
+
+	err = r.DB.QueryRow(
+		ctx,
+		`UPDATE products
+         SET low_stock_threshold = $1,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING id, sku, name, description, category_id,
+                   unit, low_stock_threshold`,
+		threshold,
+		productID,
+	).Scan(
+		&id,
+		&sku,
+		&name,
+		&description,
+		&categoryID,
+		&unit,
+		&updatedThreshold,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("product not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update product threshold: %w", err)
+	}
+
+	var categoryIDString *string
+	if categoryID != nil {
+		value := strconv.FormatInt(*categoryID, 10)
+		categoryIDString = &value
+	}
+
+	return &model.Product{
+		ID:                strconv.FormatInt(id, 10),
+		Sku:               sku,
+		Name:              name,
+		Description:       description,
+		CategoryID:        categoryIDString,
+		Unit:              unit,
+		LowStockThreshold: updatedThreshold,
+	}, nil
+}
+
 // Categories is the resolver for the categories field.
 func (r *queryResolver) Categories(ctx context.Context) ([]*model.Category, error) {
 	rows, err := r.DB.Query(
@@ -867,7 +950,8 @@ func (r *queryResolver) Categories(ctx context.Context) ([]*model.Category, erro
 func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) {
 	rows, err := r.DB.Query(
 		ctx,
-		`SELECT id, sku, name, description, category_id, unit
+		`SELECT id, sku, name, description, category_id,
+                unit, low_stock_threshold
          FROM products
          ORDER BY id`,
 	)
@@ -883,6 +967,7 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 		var sku, name, unit string
 		var description *string
 		var categoryID *int64
+		var threshold float64
 
 		if err := rows.Scan(
 			&id,
@@ -891,6 +976,7 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 			&description,
 			&categoryID,
 			&unit,
+			&threshold,
 		); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
@@ -902,12 +988,13 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 		}
 
 		products = append(products, &model.Product{
-			ID:          strconv.FormatInt(id, 10),
-			Sku:         sku,
-			Name:        name,
-			Description: description,
-			CategoryID:  categoryIDString,
-			Unit:        unit,
+			ID:                strconv.FormatInt(id, 10),
+			Sku:               sku,
+			Name:              name,
+			Description:       description,
+			CategoryID:        categoryIDString,
+			Unit:              unit,
+			LowStockThreshold: threshold,
 		})
 	}
 
