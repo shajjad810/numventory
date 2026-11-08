@@ -12,6 +12,7 @@ import type {
   Product,
   Location,
 } from "../lib/inventory";
+import { downloadInventoryExcel, type InventoryExportRow } from "../lib/excel";
 
 type DashboardPageProps = {
   products: Product[];
@@ -68,6 +69,23 @@ export default function DashboardPage({
 
     return matchesSearch && matchesLocation && matchesStockLevel;
   });
+
+  async function handleExportExcel() {
+    const rows: InventoryExportRow[] = filteredInventory.map((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      const location = locations.find((l) => l.id === item.locationId);
+
+      return {
+        product: product?.name ?? "Unknown Product",
+        sku: product?.sku ?? "",
+        location: location?.name ?? "Unknown Location",
+        quantity: item.quantity,
+        unit: product?.unit ?? "",
+      };
+    });
+
+    await downloadInventoryExcel(rows);
+  }
 
   const recentTransactions = [...transactions]
     .sort(
@@ -260,6 +278,15 @@ export default function DashboardPage({
               className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Clear Filters
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleExportExcel()}
+              disabled={filteredInventory.length === 0}
+              className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Export Excel
             </button>
           </div>
         </div>
