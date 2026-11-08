@@ -1,6 +1,10 @@
 import { ArrowLeftRight } from "lucide-react";
 import type { InventoryTransaction, Product, Location } from "../lib/inventory";
 import { useState } from "react";
+import {
+  downloadTransactionsExcel,
+  type TransactionExportRow,
+} from "../lib/excel";
 
 type TransactionsPageProps = {
   transactions: InventoryTransaction[];
@@ -119,6 +123,49 @@ export default function TransactionsPage({
         return { from: location, to: "—" };
     }
   }
+
+  async function handleExportExcel() {
+    const rows: TransactionExportRow[] = [...filteredTransactions]
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .map((transaction) => {
+        const product = products.find(
+          (item) => item.id === transaction.productId,
+        );
+
+        const movement = getMovement(transaction);
+        const type = transaction.transactionType.toUpperCase();
+        const notes = transaction.notes?.toUpperCase() ?? "";
+
+        let displayType = type;
+
+        if (type === "PRODUCTION") {
+          if (notes.includes("CONSUMED")) {
+            displayType = "PRODUCTION (INPUT)";
+          } else if (notes.includes("PRODUCED")) {
+            displayType = "PRODUCTION (OUTPUT)";
+          }
+        }
+
+        return {
+          date: new Date(transaction.createdAt).toLocaleString(),
+          type: displayType,
+          product: getProductName(transaction.productId),
+          sku: product?.sku ?? "",
+          quantity: transaction.quantity,
+          unit: product?.unit ?? "",
+          from: movement.from,
+          to: movement.to,
+          reference: transaction.reference ?? "",
+          notes: transaction.notes ?? "",
+        };
+      });
+
+    await downloadTransactionsExcel(rows);
+  }
+
   function getTransactionColor(transaction: InventoryTransaction) {
     const type = transaction.transactionType.toUpperCase();
     const notes = transaction.notes?.toUpperCase() ?? "";
@@ -213,6 +260,15 @@ export default function TransactionsPage({
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Reset Filters
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleExportExcel()}
+              disabled={filteredTransactions.length === 0}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Export Excel
             </button>
           </div>
         </div>
