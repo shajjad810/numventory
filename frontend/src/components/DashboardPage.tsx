@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -25,6 +26,9 @@ export default function DashboardPage({
   inventory,
   transactions,
 }: DashboardPageProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [stockFilter, setStockFilter] = useState("all");
   const stockByUnit = inventory.reduce<Record<string, number>>(
     (totals, item) => {
       const product = products.find((p) => p.id === item.productId);
@@ -41,6 +45,28 @@ export default function DashboardPage({
     if (!product) return false;
 
     return item.quantity <= product.lowStockThreshold;
+  });
+
+  const filteredInventory = inventory.filter((item) => {
+    const product = products.find((p) => p.id === item.productId);
+
+    if (!product) return false;
+
+    const query = searchQuery.trim().toLowerCase();
+
+    const matchesSearch =
+      product.name.toLowerCase().includes(query) ||
+      product.sku.toLowerCase().includes(query);
+
+    const matchesLocation =
+      selectedLocation === "" || item.locationId === selectedLocation;
+
+    const matchesStockLevel =
+      stockFilter === "all" ||
+      (stockFilter === "low" && item.quantity <= product.lowStockThreshold) ||
+      (stockFilter === "out" && item.quantity === 0);
+
+    return matchesSearch && matchesLocation && matchesStockLevel;
   });
 
   const recentTransactions = [...transactions]
@@ -182,8 +208,67 @@ export default function DashboardPage({
             Current stock across all locations
           </p>
         </div>
+        <div className="border-b border-slate-200 px-6 py-4">
+          <div className="flex flex-col gap-3 md:flex-row">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by product name or SKU..."
+              aria-label="Search inventory by product name or SKU"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none md:flex-1"
+            />
+
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              aria-label="Filter inventory by location"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none md:w-56"
+            >
+              <option value="">All Locations</option>
+
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value)}
+              aria-label="Filter inventory by stock level"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none md:w-48"
+            >
+              <option value="all">All Stock Levels</option>
+              <option value="low">Low Stock</option>
+              <option value="out">Out of Stock</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedLocation("");
+                setStockFilter("all");
+              }}
+              disabled={
+                searchQuery === "" &&
+                selectedLocation === "" &&
+                stockFilter === "all"
+              }
+              className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
+          <div className="px-6 py-3 text-sm text-slate-500">
+            Showing {filteredInventory.length} of {inventory.length} inventory
+            records
+          </div>
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
@@ -194,7 +279,7 @@ export default function DashboardPage({
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {inventory.map((item) => {
+              {filteredInventory.map((item) => {
                 const product = products.find((p) => p.id === item.productId);
 
                 return (
@@ -212,13 +297,17 @@ export default function DashboardPage({
                 );
               })}
 
-              {inventory.length === 0 && (
+              {filteredInventory.length === 0 && (
                 <tr>
                   <td
                     colSpan={3}
                     className="px-6 py-8 text-center text-slate-500"
                   >
-                    No inventory records found.
+                    {searchQuery.trim() ||
+                    selectedLocation ||
+                    stockFilter !== "all"
+                      ? "No inventory records match your filters."
+                      : "No inventory records found."}
                   </td>
                 </tr>
               )}
