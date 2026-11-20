@@ -15,8 +15,10 @@ import {
   Factory,
   Trash2,
   ClipboardList,
-  UserCircle,
+  LogOut,
 } from "lucide-react-native";
+import { useRouter, type Href } from "expo-router";
+import { useAuth } from "../context/auth-context";
 
 const operations = [
   {
@@ -25,6 +27,7 @@ const operations = [
     icon: PackagePlus,
     color: "#16A34A",
     background: "#DCFCE7",
+    route: "/receiving",
   },
   {
     name: "Shipping",
@@ -32,6 +35,7 @@ const operations = [
     icon: Truck,
     color: "#2563EB",
     background: "#DBEAFE",
+    route: "/shipping",
   },
   {
     name: "Transfer",
@@ -39,6 +43,7 @@ const operations = [
     icon: ArrowLeftRight,
     color: "#7C3AED",
     background: "#EDE9FE",
+    route: "/transfer",
   },
   {
     name: "Production",
@@ -46,6 +51,7 @@ const operations = [
     icon: Factory,
     color: "#EA580C",
     background: "#FFEDD5",
+    route: "/production",
   },
   {
     name: "Waste",
@@ -53,6 +59,7 @@ const operations = [
     icon: Trash2,
     color: "#DC2626",
     background: "#FEE2E2",
+    route: "/waste",
   },
   {
     name: "Inventory",
@@ -60,10 +67,34 @@ const operations = [
     icon: ClipboardList,
     color: "#0891B2",
     background: "#CFFAFE",
+    route: "/inventory",
   },
-];
+] as const;
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { signOut } = useAuth();
+
+  function handleLogout() {
+    Alert.alert("Logout", "Are you sure you want to log out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch {
+            Alert.alert("Error", "Unable to log out. Please try again.");
+          }
+        },
+      },
+    ]);
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -78,7 +109,18 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <UserCircle size={32} color="#64748B" />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Logout"
+          onPress={handleLogout}
+          style={({ pressed }) => [
+            styles.logoutButton,
+            pressed && styles.logoutPressed,
+          ]}
+        >
+          <LogOut size={22} color="#DC2626" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -94,7 +136,7 @@ export default function HomeScreen() {
               <Pressable
                 key={operation.name}
                 accessibilityRole="button"
-                onPress={() => Alert.alert(operation.name, "Coming soon")}
+                onPress={() => router.push(operation.route as Href)}
                 style={({ pressed }) => [
                   styles.card,
                   pressed && styles.cardPressed,
@@ -228,5 +270,25 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: "#94A3B8",
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+  },
+  logoutPressed: {
+    opacity: 0.6,
+  },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#DC2626",
   },
 });
