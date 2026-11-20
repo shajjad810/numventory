@@ -5,6 +5,7 @@ export type Product = {
   sku: string;
   name: string;
   unit: string;
+  lowStockThreshold?: number;
 };
 
 export type Location = {
